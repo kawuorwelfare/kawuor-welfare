@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KAWUOR WELFARE – Administration</title>
+<style>
+:root{--bg:#f5f8f6;--surface:#fff;--ink:#14302b;--muted:#4d625e;--brand:#0f5c4d;--brand-ink:#fff;--accent:#f2b134;--line:#d3e0db;--ok:#1d7a4d;--warn:#a96a00;--bad:#b3261e;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1f1c;--surface:#16302b;--ink:#e8f1ee;--muted:#9db5af;--brand:#4fc3a8;--brand-ink:#06201a;--line:#27463f;--ok:#6fd39b;--warn:#f2b134;--bad:#ff8a80;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:1rem/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:72rem;margin:0 auto;padding:0 1rem}
+header{border-bottom:1px solid var(--line)}header .wrap{display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.8rem 1rem}
+h2{margin:0 0 .8rem;font-size:1.25rem}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:1rem;padding:1.1rem;margin:1rem 0}
+label{display:block;font-weight:600;margin:.7rem 0 .2rem}
+input,select,textarea{width:100%;padding:.6rem;border:1px solid var(--line);border-radius:.5rem;background:var(--bg);color:var(--ink);font:inherit}
+button,a.btn{font:inherit;font-weight:700;padding:.55rem 1rem;border-radius:.5rem;border:2px solid var(--brand);background:var(--brand);color:var(--brand-ink);cursor:pointer;text-decoration:none;display:inline-block}
+button.ghost,a.btn.ghost{background:transparent;color:var(--ink)}
+button.sm{padding:.25rem .6rem;font-size:.85rem}button.danger{background:transparent;color:var(--bad);border-color:var(--bad)}
+form button[type=submit]{margin-top:1rem}
+#msg{padding:.8rem 1rem;border-radius:.5rem;margin:1rem 0;font-weight:600;border:1px solid var(--line);background:var(--surface)}
+#msg.bad{color:var(--bad);border-color:var(--bad)}#msg.ok{color:var(--ok);border-color:var(--ok)}
+.tabs{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:1rem}.tabs button{background:transparent;color:var(--ink);border-color:var(--line)}
+.tabs button[aria-selected=true]{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.stats{display:grid;gap:.8rem;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))}
+.stat{border-left:4px solid var(--accent);padding-left:.7rem}.stat small{display:block;color:var(--muted)}.stat b{font-size:1.3rem}
+.grid2{display:grid;gap:.8rem;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))}
+.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse}td,th{padding:.5rem;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+.tag{padding:.1rem .5rem;border-radius:1rem;border:1px solid var(--line);font-size:.85rem}
+.t-active,.t-approved{color:var(--ok);border-color:var(--ok)}.t-pending,.t-approaching{color:var(--warn);border-color:var(--warn)}.t-deregistered,.t-rejected,.t-reversed,.t-defaulted{color:var(--bad);border-color:var(--bad)}
+.t-open,.t-published{color:var(--ok);border-color:var(--ok)}.t-closed,.t-draft,.t-expired{color:var(--muted)}@media print{header,.tabs,#msg,.noprint{display:none!important}body{background:#fff;color:#000}.card{border:0;padding:0}}
+.muted{color:var(--muted)}[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header><div class="wrap"><b>KAWUOR WELFARE · Administration</b><span><a class="btn ghost sm" href="index.html">Member portal</a> <button id="logout" class="ghost sm" hidden>Log out</button></span></div></header>
+<main class="wrap">
+<div id="msg" role="status" hidden></div>
+<form id="f-login" class="card" hidden><h2>Administrator login</h2>
+  <label for="l-email">Email</label><input id="l-email" type="email" autocomplete="email" required>
+  <label for="l-pass">Password</label><input id="l-pass" type="password" autocomplete="current-password" required>
+  <button type="submit">Log in</button></form>
+<section id="app" hidden>
+  <div class="tabs" role="tablist">
+    <button role="tab" data-tab="dash" aria-selected="true">Dashboard</button>
+    <button role="tab" data-tab="members" aria-selected="false">Members</button>
+    <button role="tab" data-tab="pay" aria-selected="false">Payments</button>
+    <button role="tab" data-tab="watch" aria-selected="false">Default watch</button>
+    <button role="tab" data-tab="cases" aria-selected="false">Welfare cases</button>
+    <button role="tab" data-tab="exp" aria-selected="false">Expenses</button>
+    <button role="tab" data-tab="ann" aria-selected="false">Announcements</button>
+    <button role="tab" data-tab="rep" aria-selected="false">Reports</button>
+  </div>
+  <div id="p-dash"></div><div id="p-members" hidden></div><div id="p-pay" hidden></div><div id="p-watch" hidden></div><div id="p-cases" hidden></div><div id="p-exp" hidden></div><div id="p-ann" hidden></div><div id="p-rep" hidden></div>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>'KSh '+Number(n||0).toLocaleString('en-KE');
+const fdate=d=>d?new Date(d.slice(0,10)+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
+const today=()=>new Date().toISOString().slice(0,10);
+const KIND={monthly:'Monthly',registration:'Registration',special:'Special'};
+const db=supabase.createClient(KAWUOR_CONFIG.url,KAWUOR_CONFIG.anonKey);
+let uid=null,members=[],started=false;
+
+function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=t?(bad?'bad':'ok'):'';m.hidden=!t}
+function friendly(e){if(e&&e.code==='23503')return 'This case has contributions recorded, so it cannot be deleted. Close it instead.';if(e&&e.code==='23505')return 'That transaction code has already been recorded.';return (e&&e.message)||'Something went wrong. Please try again.'}
+async function run(fn){try{say('');await fn()}catch(e){say(friendly(e),true)}}
+async function rpc(name,args){const{data,error}=await db.rpc(name,args);if(error)throw error;return data}
+function tag(s){return `<span class="tag t-${esc(s)}">${esc(s)}</span>`}
+
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-tab]').forEach(x=>x.setAttribute('aria-selected',x===b));
+  for(const t of ['dash','members','pay','watch','cases','exp','ann','rep'])$('p-'+t).hidden=t!==b.dataset.tab});
+$('f-login').onsubmit=e=>{e.preventDefault();run(async()=>{const{error}=await db.auth.signInWithPassword({email:$('l-email').value.trim(),password:$('l-pass').value});if(error)throw error})};
+$('logout').onclick=()=>db.auth.signOut();
+db.auth.onAuthStateChange((ev,s)=>{
+  if(s&&s.user){if(s.user.id!==uid){uid=s.user.id;setTimeout(start,0)}}
+  else{uid=null;started=false;$('app').hidden=true;$('logout').hidden=true;$('f-login').hidden=false}});
+
+async function start(){await run(async()=>{
+  const r=await db.from('user_roles').select('role').eq('user_id',uid).maybeSingle();
+  if(r.error)throw r.error;
+  if(!r.data||r.data.role!=='admin'){$('f-login').hidden=true;$('app').hidden=true;$('logout').hidden=false;say('This page is for administrators only. Your account is not an administrator.',true);return}
+  $('f-login').hidden=true;$('app').hidden=false;$('logout').hidden=false;started=true;
+  await refresh()})}
+async function refresh(){await membersTab();await Promise.all([dash(),payTab(),watch(),casesTab(),expTab(),annTab(),repTab()])}
+
+async function dash(){
+  const d=await rpc('admin_dashboard');
+  const S=(l,v)=>`<div class="stat"><small>${l}</small><b>${v}</b></div>`;
+  $('p-dash').innerHTML=`<div class="card"><h2>Members</h2><div class="stats">${S('Registered people',d.members_total)}${S('Active memberships',d.active)}${S('Deregistered',d.deregistered)}${S('Re-registered (active)',d.re_registered)}</div></div>
+  <div class="card"><h2>Money</h2><div class="stats">${S('Monthly contributions',money(d.monthly_total))}${S('Registration fees',money(d.registration_total))}${S('Special contributions',money(d.special_total))}${S('Outstanding',money(d.outstanding))}${S('Paid in advance',money(d.advance))}${S('Total expenses',money(d.expenses_total))}</div></div>
+  <div class="card"><h2>Cases and approvals</h2><div class="stats">${S('Open welfare cases',d.cases_open)}${S('Closed welfare cases',d.cases_closed)}${S('Payments waiting for approval',d.pending_payments)}</div></div>
+  <div class="card"><h2>Recent transactions</h2><div class="scroll"><table><thead><tr><th>Date</th><th>From</th><th>For</th><th>Amount</th><th>Code</th><th>Status</th></tr></thead><tbody>
+  ${d.recent_payments.map(p=>`<tr><td>${fdate(p.paid_on)}</td><td>${esc(p.who)}</td><td>${KIND[p.kind]}</td><td>${money(p.amount)}</td><td>${esc(p.reference)}</td><td>${tag(p.status)}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">No transactions yet.</td></tr>'}</tbody></table></div></div>`}
+
+async function membersTab(){
+  const{data,error}=await db.from('v_admin_members').select('*').order('full_name');if(error)throw error;members=data;
+  $('p-members').innerHTML=`<div class="card"><h2>Members</h2><div class="grid2">
+   <div><label for="q">Search name, phone or number</label><input id="q"></div>
+   <div><label for="sf">Show</label><select id="sf"><option value="">Everyone</option><option value="active">Active</option><option value="deregistered">Deregistered</option><option value="none">Awaiting membership</option><option value="arrears">In arrears</option><option value="advance">Paid in advance</option></select></div></div>
+   <div class="scroll" style="margin-top:1rem"><table><thead><tr><th>Name</th><th>Phone</th><th>Number</th><th>Status</th><th>Joined</th><th>Outstanding</th><th>Advance</th><th></th></tr></thead><tbody id="mrows"></tbody></table></div></div>`;
+  $('q').oninput=$('sf').onchange=drawMembers;drawMembers()}
+function drawMembers(){
+  const q=$('q').value.toLowerCase(),f=$('sf').value;
+  $('mrows').innerHTML=members.filter(m=>{
+    if(q&&!`${m.full_name} ${m.phone||''} ${m.number||''}`.toLowerCase().includes(q))return false;
+    if(f==='active')return m.status==='active';if(f==='deregistered')return m.status==='deregistered';
+    if(f==='none')return !m.membership_id;if(f==='arrears')return Number(m.outstanding)>0;if(f==='advance')return Number(m.advance_paid)>0;return true})
+   .map(m=>`<tr><td>${esc(m.full_name)}<br><span class="muted">${esc(m.email)}</span></td><td>${esc(m.phone)}</td><td>${esc(m.number||'')}</td><td>${m.status?tag(m.status):'<span class="muted">Awaiting</span>'}</td><td>${fdate(m.joined_on)}</td><td>${m.membership_id?money(m.outstanding):''}</td><td>${m.membership_id?money(m.advance_paid):''}</td>
+   <td>${m.status==='active'?`<button class="sm danger" data-dereg="${esc(m.membership_id)}" data-n="${esc(m.full_name)}">Deregister</button>`:`<button class="sm" data-reg="${esc(m.member_id)}" data-n="${esc(m.full_name)}">${m.membership_id?'Re-register':'Register'}</button>`}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No members match.</td></tr>';
+  document.querySelectorAll('[data-reg]').forEach(b=>b.onclick=()=>run(async()=>{
+    const d=prompt(`Joining date for ${b.dataset.n} (YYYY-MM-DD). It can be a past date.`,today());if(!d)return;
+    const r=await rpc('register_membership',{p_member_id:b.dataset.reg,p_joined_on:d});say(`${b.dataset.n} registered as ${r.number}.`);await refresh()}));
+  document.querySelectorAll('[data-dereg]').forEach(b=>b.onclick=()=>run(async()=>{
+    const why=prompt(`Reason for deregistering ${b.dataset.n}:`);if(!why)return;
+    await rpc('deregister_membership',{p_membership_id:b.dataset.dereg,p_reason:why,p_date:today()});say('Membership deregistered.');await refresh()}))}
+
+async function payTab(){
+  const{data,error}=await db.from('v_admin_payments').select('*').order('created_at',{ascending:false}).limit(300);if(error)throw error;
+  const pend=data.filter(p=>p.status==='pending');const cs=(await db.from('v_case_progress').select('id,title,beneficiary_name').eq('status','open')).data||[];
+  const row=(p,acts)=>`<tr><td>${fdate(p.paid_on)}</td><td>${esc(p.who)}</td><td>${esc(p.number||'')}</td><td>${KIND[p.kind]}</td><td>${money(p.amount)}</td><td>${esc(p.method)}</td><td>${esc(p.reference)}</td><td>${tag(p.status)}${p.review_note?`<br><span class="muted">${esc(p.review_note)}</span>`:''}</td><td>${acts}</td></tr>`;
+  const head='<thead><tr><th>Date</th><th>From</th><th>No.</th><th>For</th><th>Amount</th><th>Method</th><th>Code</th><th>Status</th><th></th></tr></thead>';
+  $('p-pay').innerHTML=`<div class="card"><h2>Record a payment</h2><p class="muted">Use this for a payment you have already checked. It is approved and allocated straight away.</p>
+   <form id="f-rec"><div class="grid2"><div><label for="rm">From</label><select id="rm"><option value="">Non-member (voluntary)</option>${members.map(m=>`<option value="${esc(m.member_id)}">${esc(m.full_name)}${m.number?' ('+esc(m.number)+')':''}</option>`).join('')}</select></div>
+   <div id="nmw"><label for="nm">Non-member name</label><input id="nm"></div>
+   <div><label for="rk">For</label><select id="rk"><option value="monthly">Monthly contribution</option><option value="registration">Registration fee</option><option value="special">Special / welfare contribution</option></select></div>
+   <div><label for="ra">Amount (KSh)</label><input id="ra" type="number" min="1" step="1" required></div>
+   <div><label for="rd">Date paid</label><input id="rd" type="date" value="${today()}" required></div>
+   <div><label for="rmth">Method</label><select id="rmth"><option>M-Pesa</option><option>Bank</option><option>Cash</option></select></div>
+   <div><label for="rr">Transaction code</label><input id="rr" required></div><div id="rcw" hidden><label for="rc">Welfare case (optional)</label><select id="rc"><option value="">General contribution</option>${cs.map(c=>`<option value="${esc(c.id)}">${esc(c.title)} (${esc(c.beneficiary_name)})</option>`).join('')}</select></div></div><button type="submit">Record payment</button></form></div>
+   <div class="card"><h2>Waiting for approval (${pend.length})</h2><div class="scroll"><table>${head}<tbody>${pend.map(p=>row(p,`<button class="sm" data-ap="${p.id}">Approve</button> <button class="sm danger" data-rj="${p.id}">Reject</button>`)).join('')||'<tr><td colspan="9" class="muted">Nothing waiting.</td></tr>'}</tbody></table></div></div>
+   <div class="card"><h2>Latest payments</h2><div class="scroll"><table>${head}<tbody>${data.filter(p=>p.status!=='pending').slice(0,100).map(p=>row(p,p.status==='approved'?`<button class="sm danger" data-rv="${p.id}">Reverse</button>`:'')).join('')}</tbody></table></div></div>`;
+  const sync=()=>{const nm=!$('rm').value;$('nmw').hidden=!nm;$('nm').required=nm;if(nm)$('rk').value='special';$('rk').disabled=nm;$('rcw').hidden=(nm?'special':$('rk').value)!=='special'};$('rm').onchange=$('rk').onchange=sync;sync();
+  $('f-rec').onsubmit=e=>{e.preventDefault();run(async()=>{const nm=!$('rm').value;
+    await rpc('record_payment',{p_member_id:$('rm').value||null,p_kind:nm?'special':$('rk').value,p_amount:+$('ra').value,p_paid_on:$('rd').value,p_method:$('rmth').value,p_reference:$('rr').value.trim(),p_contributor_name:nm?$('nm').value.trim():null,p_case_id:(nm||$('rk').value==='special')&&$('rc').value?$('rc').value:null});
+    say('Payment recorded and allocated.');await refresh()})};
+  document.querySelectorAll('[data-ap]').forEach(b=>b.onclick=()=>run(async()=>{await rpc('approve_payment',{p_id:b.dataset.ap});say('Payment approved and allocated.');await refresh()}));
+  document.querySelectorAll('[data-rj]').forEach(b=>b.onclick=()=>run(async()=>{const r=prompt('Reason for rejecting this payment:');if(!r)return;await rpc('reject_payment',{p_id:b.dataset.rj,p_reason:r});say('Payment rejected.');await refresh()}));
+  document.querySelectorAll('[data-rv]').forEach(b=>b.onclick=()=>run(async()=>{const r=prompt('Reason for reversing this approved payment (it will no longer count):');if(!r)return;await rpc('reverse_payment',{p_id:b.dataset.rv,p_reason:r});say('Payment reversed.');await refresh()}))}
+
+async function watch(){
+  const{data,error}=await db.from('v_default_watch').select('*').neq('risk','ok').order('consecutive_unpaid',{ascending:false});if(error)throw error;
+  $('p-watch').innerHTML=`<div class="card"><h2>Members approaching or at the default limit</h2>
+   <p class="muted">Counts completed months with no payment at all. Update the months first so the list is current. The check also runs by itself each month if you set up the schedule.</p>
+   <button id="gen" class="ghost">Update months</button> <button id="chk" class="danger">Run default check now</button>
+   <div class="scroll" style="margin-top:1rem"><table><thead><tr><th>Number</th><th>Name</th><th>Months unpaid in a row</th><th>Risk</th></tr></thead><tbody>
+   ${data.map(w=>`<tr><td>${esc(w.number)}</td><td>${esc(w.full_name)}</td><td>${w.consecutive_unpaid}</td><td>${tag(w.risk)}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">No one is close to the limit.</td></tr>'}</tbody></table></div></div>`;
+  $('gen').onclick=()=>run(async()=>{await rpc('admin_generate_dues');say('Months updated.');await watch()});
+  $('chk').onclick=()=>run(async()=>{if(!confirm('This will deregister every member at or over the limit. Continue?'))return;const n=await rpc('admin_run_default_check');say(`Check complete. ${n} member(s) deregistered.`);await refresh()})}
+
+const CT={bereavement:'Bereavement',medical:'Medical',education:'Education',emergency:'Emergency',other:'Other'};
+const CATS=['Bereavement support','Medical assistance','Education support','Meetings','Administration','Other'];
+let editCase=null,editExp=null,editAnn=null,expF={from:'',to:'',cat:''};
+
+async function casesTab(){
+  const{data,error}=await db.from('v_case_progress').select('*').order('status').order('case_date',{ascending:false});if(error)throw error;
+  const x=editCase||{};
+  $('p-cases').innerHTML=`<div class="card"><h2>${x.id?'Edit welfare case':'New welfare case'}</h2><form id="f-case"><div class="grid2">
+   <div><label for="ct">Case type</label><select id="ct">${Object.entries(CT).map(([k,v])=>`<option value="${k}"${x.case_type===k?' selected':''}>${v}</option>`).join('')}</select></div>
+   <div><label for="cb">Beneficiary name</label><input id="cb" value="${esc(x.beneficiary_name)}" required></div>
+   <div><label for="cti">Title</label><input id="cti" value="${esc(x.title)}" required></div>
+   <div><label for="cd">Case date</label><input id="cd" type="date" value="${esc(x.case_date||today())}" required></div>
+   <div><label for="cg">Target amount (KSh, optional)</label><input id="cg" type="number" min="1" step="1" value="${esc(x.target_amount||'')}"></div></div>
+   <label for="cdt">Details and reason for the appeal</label><textarea id="cdt" rows="3">${esc(x.details)}</textarea>
+   <button type="submit">${x.id?'Save changes':'Create case'}</button>${x.id?' <button type="button" id="cx" class="ghost">Cancel</button>':''}</form></div>
+   <div class="card"><h2>All welfare cases</h2><p class="muted">To record a contribution to a case, use the Payments tab and choose the case.</p><div class="scroll"><table><thead><tr><th>Case</th><th>Type</th><th>Date</th><th>Target</th><th>Collected</th><th>Remaining</th><th>Status</th><th></th></tr></thead><tbody>
+   ${data.map(c=>`<tr><td>${esc(c.title)}<br><span class="muted">${esc(c.beneficiary_name)}</span></td><td>${CT[c.case_type]}</td><td>${fdate(c.case_date)}</td><td>${c.target_amount?money(c.target_amount):'None'}</td><td>${money(c.collected)}${c.percent!=null?` (${c.percent}%)`:''}</td><td>${c.remaining!=null?money(c.remaining):''}</td><td>${tag(c.status)}</td>
+   <td><button class="sm ghost" data-ce="${c.id}">Edit</button> <button class="sm ghost" data-cv="${c.id}">Contributions</button> <button class="sm" data-cs="${c.id}" data-st="${c.status}">${c.status==='open'?'Close':'Reopen'}</button> <button class="sm danger" data-cdel="${c.id}">Delete</button></td></tr>`).join('')||'<tr><td colspan="8" class="muted">No cases yet.</td></tr>'}</tbody></table></div></div><div id="cc"></div>`;
+  $('f-case').onsubmit=e=>{e.preventDefault();run(async()=>{
+    const row={case_type:$('ct').value,beneficiary_name:$('cb').value.trim(),title:$('cti').value.trim(),details:$('cdt').value.trim(),case_date:$('cd').value,target_amount:$('cg').value?+$('cg').value:null};
+    const r=x.id?await db.from('welfare_cases').update(row).eq('id',x.id):await db.from('welfare_cases').insert(row);if(r.error)throw r.error;
+    say(x.id?'Case updated.':'Case created. Active members can now see it.');editCase=null;await refresh()})};
+  if($('cx'))$('cx').onclick=()=>{editCase=null;casesTab()};
+  document.querySelectorAll('[data-ce]').forEach(b=>b.onclick=()=>{editCase=data.find(c=>c.id===b.dataset.ce);casesTab().then(()=>scrollTo(0,0))});
+  document.querySelectorAll('[data-cs]').forEach(b=>b.onclick=()=>run(async()=>{const st=b.dataset.st==='open'?'closed':'open';
+    const r=await db.from('welfare_cases').update({status:st}).eq('id',b.dataset.cs);if(r.error)throw r.error;say(st==='closed'?'Case closed.':'Case reopened.');await refresh()}));
+  document.querySelectorAll('[data-cdel]').forEach(b=>b.onclick=()=>run(async()=>{if(!confirm('Delete this case permanently?'))return;
+    const r=await db.from('welfare_cases').delete().eq('id',b.dataset.cdel);if(r.error)throw r.error;say('Case deleted.');await refresh()}));
+  document.querySelectorAll('[data-cv]').forEach(b=>b.onclick=()=>run(async()=>{
+    const r=await db.from('v_admin_payments').select('*').eq('case_id',b.dataset.cv).eq('status','approved').order('paid_on',{ascending:false});if(r.error)throw r.error;
+    $('cc').innerHTML=`<div class="card"><h2>Approved contributions</h2><div class="scroll"><table><thead><tr><th>Date</th><th>From</th><th>Amount</th><th>Code</th></tr></thead><tbody>${r.data.map(p=>`<tr><td>${fdate(p.paid_on)}</td><td>${esc(p.who)}</td><td>${money(p.amount)}</td><td>${esc(p.reference)}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">No approved contributions yet.</td></tr>'}</tbody></table></div></div>`;$('cc').scrollIntoView()}))}
+
+async function expTab(){
+  const f=expF;let q=db.from('expenses').select('*').order('spent_on',{ascending:false}).limit(500);
+  if(f.from)q=q.gte('spent_on',f.from);if(f.to)q=q.lte('spent_on',f.to);if(f.cat)q=q.eq('category',f.cat);
+  const[r,c,cs]=await Promise.all([q,db.from('expenses').select('category').limit(2000),db.from('v_case_progress').select('id,title').order('case_date',{ascending:false})]);
+  if(r.error)throw r.error;
+  const cats=[...new Set([...CATS,...(c.data||[]).map(y=>y.category)])].sort(),x=editExp||{},total=r.data.reduce((a,y)=>a+Number(y.amount),0);
+  $('p-exp').innerHTML=`<div class="card"><h2>${x.id?'Edit expense':'Record an expense'}</h2><form id="f-exp"><div class="grid2">
+   <div><label for="ed">Date</label><input id="ed" type="date" value="${esc(x.spent_on||today())}" required></div>
+   <div><label for="ec">Category</label><input id="ec" list="cats" value="${esc(x.category)}" required><datalist id="cats">${cats.map(k=>`<option value="${esc(k)}">`).join('')}</datalist></div>
+   <div><label for="eam">Amount (KSh)</label><input id="eam" type="number" min="1" step="1" value="${esc(x.amount||'')}" required></div>
+   <div><label for="ep">Paid to (optional)</label><input id="ep" value="${esc(x.payee)}"></div>
+   <div><label for="ecs">Welfare case (optional)</label><select id="ecs"><option value="">None</option>${(cs.data||[]).map(k=>`<option value="${esc(k.id)}"${x.case_id===k.id?' selected':''}>${esc(k.title)}</option>`).join('')}</select></div></div>
+   <label for="edesc">Description and supporting details</label><textarea id="edesc" rows="2" required>${esc(x.description)}</textarea>
+   <button type="submit">${x.id?'Save changes':'Record expense'}</button>${x.id?' <button type="button" id="ex" class="ghost">Cancel</button>':''}</form></div>
+   <div class="card"><h2>Expenses</h2><div class="grid2"><div><label for="ff">From</label><input id="ff" type="date" value="${esc(f.from)}"></div><div><label for="ft">To</label><input id="ft" type="date" value="${esc(f.to)}"></div>
+   <div><label for="fc">Category</label><select id="fc"><option value="">All</option>${cats.map(k=>`<option${f.cat===k?' selected':''}>${esc(k)}</option>`).join('')}</select></div></div>
+   <p><b>Total for this list: ${money(total)}</b>${r.data.length>=500?' <span class="muted">(showing the latest 500)</span>':''}</p>
+   <div class="scroll"><table><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Paid to</th><th>Amount</th><th>Last changed</th><th></th></tr></thead><tbody>
+   ${r.data.map(y=>`<tr><td>${fdate(y.spent_on)}</td><td>${esc(y.category)}</td><td style="white-space:normal">${esc(y.description)}</td><td>${esc(y.payee)}</td><td>${money(y.amount)}</td><td>${fdate(y.updated_at)}</td><td><button class="sm ghost" data-ee="${y.id}">Edit</button></td></tr>`).join('')||'<tr><td colspan="7" class="muted">No expenses match.</td></tr>'}</tbody></table></div></div>`;
+  $('f-exp').onsubmit=e=>{e.preventDefault();run(async()=>{
+    const row={spent_on:$('ed').value,category:$('ec').value.trim(),description:$('edesc').value.trim(),amount:+$('eam').value,payee:$('ep').value.trim()||null,case_id:$('ecs').value||null};
+    const w=x.id?await db.from('expenses').update(row).eq('id',x.id):await db.from('expenses').insert(row);if(w.error)throw w.error;
+    say(x.id?'Expense updated. The earlier version is kept in the edit log.':'Expense recorded.');editExp=null;await refresh()})};
+  if($('ex'))$('ex').onclick=()=>{editExp=null;expTab()};
+  ['ff','ft','fc'].forEach(k=>$(k).onchange=()=>{expF={from:$('ff').value,to:$('ft').value,cat:$('fc').value};expTab()});
+  document.querySelectorAll('[data-ee]').forEach(b=>b.onclick=()=>{editExp=r.data.find(y=>y.id===b.dataset.ee);expTab().then(()=>scrollTo(0,0))})}
+
+async function annTab(){
+  const{data,error}=await db.from('announcements').select('*').order('created_at',{ascending:false});if(error)throw error;
+  const x=editAnn||{},st=a=>!a.published?'draft':(a.expires_on&&a.expires_on<today()?'expired':'published');
+  $('p-ann').innerHTML=`<div class="card"><h2>${x.id?'Edit announcement':'New announcement'}</h2><form id="f-ann">
+   <label for="at">Title</label><input id="at" value="${esc(x.title)}" required>
+   <label for="ab">Message</label><textarea id="ab" rows="4" required>${esc(x.body)}</textarea>
+   <label for="ax">Show until (optional)</label><input id="ax" type="date" value="${esc(x.expires_on||'')}">
+   <label><input id="ap" type="checkbox" style="width:auto"${x.published?' checked':''}> Publish to members</label>
+   <button type="submit">${x.id?'Save changes':'Save announcement'}</button>${x.id?' <button type="button" id="axc" class="ghost">Cancel</button>':''}</form></div>
+   <div class="card"><h2>Announcements</h2><div class="scroll"><table><thead><tr><th>Title</th><th>Status</th><th>Published</th><th>Until</th><th></th></tr></thead><tbody>
+   ${data.map(a=>`<tr><td>${esc(a.title)}</td><td>${tag(st(a))}</td><td>${fdate(a.published_at)}</td><td>${fdate(a.expires_on)}</td><td><button class="sm ghost" data-ae="${a.id}">Edit</button> <button class="sm" data-apub="${a.id}" data-p="${a.published}">${a.published?'Unpublish':'Publish'}</button> <button class="sm danger" data-ad="${a.id}">Remove</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">No announcements yet.</td></tr>'}</tbody></table></div></div>`;
+  $('f-ann').onsubmit=e=>{e.preventDefault();run(async()=>{
+    const pub=$('ap').checked,row={title:$('at').value.trim(),body:$('ab').value.trim(),expires_on:$('ax').value||null,published:pub};
+    if(pub&&!x.published)row.published_at=new Date().toISOString();
+    const w=x.id?await db.from('announcements').update(row).eq('id',x.id):await db.from('announcements').insert(row);if(w.error)throw w.error;
+    say(pub?'Announcement saved and visible to active members.':'Announcement saved as a draft.');editAnn=null;await annTab()})};
+  if($('axc'))$('axc').onclick=()=>{editAnn=null;annTab()};
+  document.querySelectorAll('[data-ae]').forEach(b=>b.onclick=()=>{editAnn=data.find(a=>a.id===b.dataset.ae);annTab().then(()=>scrollTo(0,0))});
+  document.querySelectorAll('[data-apub]').forEach(b=>b.onclick=()=>run(async()=>{const on=b.dataset.p!=='true',row={published:on};if(on)row.published_at=new Date().toISOString();
+    const w=await db.from('announcements').update(row).eq('id',b.dataset.apub);if(w.error)throw w.error;say(on?'Published.':'Unpublished.');await annTab()}));
+  document.querySelectorAll('[data-ad]').forEach(b=>b.onclick=()=>run(async()=>{if(!confirm('Remove this announcement?'))return;
+    const w=await db.from('announcements').delete().eq('id',b.dataset.ad);if(w.error)throw w.error;say('Announcement removed.');await annTab()}))}
+
+const RL={monthly:'Monthly contributions',registration:'Registration fees',special:'Special welfare contributions'};
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const curM=()=>today().slice(0,7)+'-01',fmtM=d=>MON[+d.slice(5,7)-1]+' '+d.slice(0,4);
+async function fetchAll(make){let out=[],from=0;for(;;){const{data,error}=await make().range(from,from+999);if(error)throw error;out=out.concat(data);if(data.length<1000)break;from+=1000}return out}
+const sum=(rows,i)=>rows.reduce((a,r)=>a+Number(r[i]||0),0);
+const grp=(rows,fn)=>{const m=new Map();rows.forEach(r=>{if(!m.has(r.membership_id))m.set(r.membership_id,{number:r.number,name:r.full_name,months:0,a:0,b:0,c:0,d:0});fn(m.get(r.membership_id),r)});return[...m.values()].sort((x,y)=>String(x.number).localeCompare(String(y.number)))};
+const monthsQ=(f,fromP,toP)=>()=>{let b=db.from('v_report_months').select('*').order('period').order('membership_id');if(fromP)b=b.gte('period',fromP);if(toP)b=b.lte('period',toP);if(f.member)b=b.eq('member_id',f.member);return b};
+const payQ=(f,kind)=>()=>{let b=db.from('v_admin_payments').select('*').eq('kind',kind).eq('status','approved').gte('paid_on',f.from).lte('paid_on',f.to).order('paid_on').order('id');if(f.member)b=b.eq('member_id',f.member);return b};
+const range=f=>fdate(f.from)+' to '+fdate(f.to);
+const REP={
+ register:{t:'Membership register',u:'Member (optional)',run:async f=>{
+  const d=(await fetchAll(()=>db.from('v_admin_members').select('*').order('full_name').order('member_id'))).filter(r=>!f.member||r.member_id===f.member);
+  const rows=d.map(r=>[r.number||'',r.full_name,r.phone,r.email,r.status||'awaiting',r.category||'',r.joined_on,r.outstanding||0,r.advance_paid||0]);
+  return{cols:[['Number'],['Name'],['Phone'],['Email'],['Status'],['Category'],['Joined','d'],['Outstanding','m'],['Advance','m']],rows,totals:[rows.length+' people',null,null,null,null,null,null,sum(rows,7),sum(rows,8)],desc:'All members'}}},
+ monthly:{t:'Monthly contributions',u:'Year, month, member (optional)',run:async f=>{
+  const d=await fetchAll(monthsQ(f,f.month?`${f.year}-${f.month}-01`:f.year+'-01-01',f.month?`${f.year}-${f.month}-01`:f.year+'-12-01'));
+  const rows=d.map(r=>[r.number,r.full_name,r.period,r.due_amount,r.paid,Math.max(r.due_amount-r.paid,0),r.status]);
+  return{cols:[['Number'],['Name'],['Month','mo'],['Due','m'],['Paid','m'],['Balance','m'],['Status']],rows,totals:['Total',null,null,sum(rows,3),sum(rows,4),sum(rows,5),null],desc:'Year '+f.year+(f.month?', '+MON[+f.month-1]:'')}}},
+ annual:{t:'Annual contributions',u:'Year, member (optional)',run:async f=>{
+  const d=await fetchAll(monthsQ(f,f.year+'-01-01',f.year+'-12-01'));
+  const rows=grp(d,(o,r)=>{if(r.period<=curM()){o.a+=+r.due_amount;o.b+=+r.paid;o.c+=Math.max(r.due_amount-r.paid,0)}else o.d+=+r.paid}).map(o=>[o.number,o.name,o.a,o.b,o.c,o.d]);
+  return{cols:[['Number'],['Name'],['Expected to date','m'],['Paid','m'],['Outstanding','m'],['Paid in advance','m']],rows,totals:['Total',null,sum(rows,2),sum(rows,3),sum(rows,4),sum(rows,5)],desc:'Year '+f.year+' (expected counts months up to the current month)'}}},
+ arrears:{t:'Member arrears',u:'Member (optional)',run:async f=>{
+  const d=(await fetchAll(monthsQ(f,null,curM()))).filter(r=>r.status==='unpaid'||r.status==='partial');
+  const rows=grp(d,(o,r)=>{o.months++;o.a+=Math.max(r.due_amount-r.paid,0)}).map(o=>[o.number,o.name,o.months,o.a]).sort((x,y)=>y[3]-x[3]);
+  return{cols:[['Number'],['Name'],['Months in arrears','n'],['Outstanding','m']],rows,totals:['Total',null,sum(rows,2),sum(rows,3)],desc:'All years, up to '+fmtM(curM())}}},
+ advance:{t:'Advance payments',u:'Member (optional)',run:async f=>{
+  const d=(await fetchAll(monthsQ(f,null,null))).filter(r=>r.period>curM()&&Number(r.paid)>0);
+  const rows=grp(d,(o,r)=>{o.months++;o.a+=+r.paid}).map(o=>[o.number,o.name,o.months,o.a]);
+  return{cols:[['Number'],['Name'],['Future months covered','n'],['Amount held','m']],rows,totals:['Total',null,sum(rows,2),sum(rows,3)],desc:'Payments held for months after '+fmtM(curM())}}},
+ registration:{t:'Registration fees',u:'From and to dates, member (optional)',run:async f=>{
+  const rows=(await fetchAll(payQ(f,'registration'))).map(r=>[r.paid_on,r.who,r.number||'',r.amount,r.method,r.reference]);
+  return{cols:[['Date','d'],['Member'],['Number'],['Amount','m'],['Method'],['Code']],rows,totals:['Total',null,null,sum(rows,3),null,null],desc:range(f)}}},
+ special:{t:'Special welfare contributions',u:'From and to dates, member (optional)',run:async f=>{
+  const cs=await fetchAll(()=>db.from('v_case_progress').select('id,title').order('id')),cm=Object.fromEntries(cs.map(c=>[c.id,c.title]));
+  const rows=(await fetchAll(payQ(f,'special'))).map(r=>[r.paid_on,r.who,cm[r.case_id]||'General',r.amount,r.method,r.reference]);
+  return{cols:[['Date','d'],['From'],['Welfare case'],['Amount','m'],['Method'],['Code']],rows,totals:['Total',null,null,sum(rows,3),null,null],desc:range(f)}}},
+ cases:{t:'Welfare cases',u:'From and to dates (case date)',run:async f=>{
+  const rows=(await fetchAll(()=>db.from('v_case_progress').select('*').gte('case_date',f.from).lte('case_date',f.to).order('case_date').order('id'))).map(c=>[c.title,c.beneficiary_name,CT[c.case_type],c.case_date,c.target_amount,c.collected,c.remaining,c.status]);
+  return{cols:[['Case'],['Beneficiary'],['Type'],['Date','d'],['Target','m'],['Collected','m'],['Remaining','m'],['Status']],rows,totals:['Total',null,null,null,sum(rows,4),sum(rows,5),sum(rows,6),null],desc:range(f)}}},
+ expenses:{t:'Welfare expenses',u:'From and to dates, category (optional)',run:async f=>{
+  const rows=(await fetchAll(()=>{let b=db.from('expenses').select('*').gte('spent_on',f.from).lte('spent_on',f.to).order('spent_on').order('id');if(f.cat)b=b.eq('category',f.cat);return b})).map(r=>[r.spent_on,r.category,r.description,r.payee,r.amount]);
+  return{cols:[['Date','d'],['Category'],['Description'],['Paid to'],['Amount','m']],rows,totals:['Total',null,null,null,sum(rows,4)],desc:range(f)+(f.cat?', '+f.cat:'')}}},
+ income:{t:'Income and expenditure',u:'From and to dates',run:async f=>{
+  const r=await rpc('admin_income_expenditure',{p_from:f.from,p_to:f.to}),ti=r.income.reduce((a,x)=>a+Number(x.total),0),te=r.expenses.reduce((a,x)=>a+Number(x.total),0);
+  const rows=[...r.income.map(x=>['Income',RL[x.kind]||x.kind,x.total]),['Total income','',ti],...r.expenses.map(x=>['Expenditure',x.category,x.total]),['Total expenditure','',te],[ti>=te?'Surplus':'Deficit','',Math.abs(ti-te)]];
+  return{cols:[['Section'],['Item'],['Amount','m']],rows,totals:null,desc:range(f)+'. Income is approved payments by date paid.'}}}
+};
+const fm=(c,v)=>v===null||v===undefined||v===''?'':c==='m'?money(v):c==='d'?fdate(v):c==='mo'?fmtM(v):esc(v);
+let lastRep=null;
+function drawRep(k,r){
+  const tr=(cells)=>`<tr>${cells.map((v,i)=>`<td${['m','n'].includes(r.cols[i][1])?' style="text-align:right"':''}>${fm(r.cols[i][1],v)}</td>`).join('')}</tr>`;
+  $('rout').innerHTML=`<div class="card"><div class="noprint" style="float:right"><button id="rp" class="ghost sm">Print</button> <button id="rcsv" class="sm">Download CSV</button></div>
+   <h2>KAWUOR WELFARE</h2><h3 style="margin:.2rem 0">${esc(REP[k].t)}</h3><p class="muted">${esc(r.desc)} · Generated ${fdate(today())}</p>
+   <div class="scroll"><table><thead><tr>${r.cols.map(c=>`<th>${esc(c[0])}</th>`).join('')}</tr></thead><tbody>${r.rows.map(tr).join('')||`<tr><td colspan="${r.cols.length}" class="muted">No records for these filters.</td></tr>`}</tbody>${r.totals?`<tfoot>${tr(r.totals).replace(/<td/g,'<td style="font-weight:700"')}</tfoot>`:''}</table></div></div>`;
+  $('rp').onclick=()=>print();
+  $('rcsv').onclick=()=>{const q=v=>`"${String(v??'').replace(/"/g,'""')}"`,all=[r.cols.map(c=>c[0]),...r.rows,...(r.totals?[r.totals]:[])];
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+all.map(x=>x.map(q).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download=`kawuor-${k}-${today()}.csv`;document.body.appendChild(a);a.click();a.remove()}}
+async function repTab(){
+  if(!$('f-rep')){
+    const y=+today().slice(0,4),yrs=[y+1,y,y-1,y-2,y-3].map(v=>`<option${v===y?' selected':''}>${v}</option>`).join('');
+    $('p-rep').innerHTML=`<div class="card noprint"><h2>Reports</h2><form id="f-rep"><div class="grid2">
+     <div><label for="rt">Report</label><select id="rt">${Object.entries(REP).map(([k,v])=>`<option value="${k}">${v.t}</option>`).join('')}</select><span id="ru" class="muted"></span></div>
+     <div><label for="rf">From</label><input id="rf" type="date" value="${y}-01-01"></div><div><label for="rto">To</label><input id="rto" type="date" value="${today()}"></div>
+     <div><label for="ry">Year</label><select id="ry">${yrs}</select></div>
+     <div><label for="rmo">Month</label><select id="rmo"><option value="">All months</option>${MON.map((m,i)=>`<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('')}</select></div>
+     <div><label for="rmem">Member</label><select id="rmem"></select></div>
+     <div><label for="rc2">Category (expenses only)</label><input id="rc2"></div></div><button type="submit">Show report</button></form></div><div id="rout"></div>`;
+    const hint=()=>$('ru').textContent='Uses: '+REP[$('rt').value].u;$('rt').onchange=hint;hint();
+    $('f-rep').onsubmit=e=>{e.preventDefault();run(async()=>{const k=$('rt').value;
+      const f={from:$('rf').value,to:$('rto').value,year:$('ry').value,month:$('rmo').value,member:$('rmem').value,cat:$('rc2').value.trim()};
+      if(f.from>f.to)throw new Error('The From date must be before the To date.');
+      drawRep(k,await REP[k].run(f))})}}
+  const cur=$('rmem').value;
+  $('rmem').innerHTML='<option value="">All members</option>'+members.map(m=>`<option value="${esc(m.member_id)}">${esc(m.full_name)}${m.number?' ('+esc(m.number)+')':''}</option>`).join('');$('rmem').value=cur}
+
+if(!KAWUOR_CONFIG.url||KAWUOR_CONFIG.url.includes('YOUR-PROJECT'))say('Setup needed: add your Supabase URL and key to config.js.',true);
+</script>
+</body>
+</html>
