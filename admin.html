@@ -25,7 +25,7 @@ form button[type=submit]{margin-top:1rem}
 .tabs{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:1rem}.tabs button{background:transparent;color:var(--ink);border-color:var(--line)}
 .tabs button[aria-selected=true]{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
 .stats{display:grid;gap:.8rem;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))}
-.stat{border-left:4px solid var(--accent);padding-left:.7rem}.stat small{display:block;color:var(--muted)}.stat b{font-size:1.3rem}
+.stat{border-left:4px solid var(--accent);padding-left:.7rem}.stat.link{cursor:pointer}.stat.link:hover{background:color-mix(in srgb,var(--accent) 14%,transparent)}a{color:var(--brand)}.stat small{display:block;color:var(--muted)}.stat b{font-size:1.3rem}
 .grid2{display:grid;gap:.8rem;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))}
 .scroll{overflow-x:auto}table{width:100%;border-collapse:collapse}td,th{padding:.5rem;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
 .tag{padding:.1rem .5rem;border-radius:1rem;border:1px solid var(--line);font-size:.85rem}
@@ -35,7 +35,7 @@ form button[type=submit]{margin-top:1rem}
 </style>
 </head>
 <body>
-<header><div class="wrap"><b>KAWUOR WELFARE · Administration</b> <small class="muted">version 10 · one-month window</small><span><a class="btn ghost sm" href="index.html">Member portal</a> <button id="logout" class="ghost sm" hidden>Log out</button></span></div></header>
+<header><div class="wrap"><b>KAWUOR WELFARE · Administration</b> <small class="muted">version 11 · dashboard links and member profiles</small><span><a class="btn ghost sm" href="index.html">Member portal</a> <button id="logout" class="ghost sm" hidden>Log out</button></span></div></header>
 <main class="wrap">
 <div id="msg" role="status" hidden></div>
 <form id="f-login" class="card" hidden><h2>Administrator login</h2>
@@ -53,7 +53,7 @@ form button[type=submit]{margin-top:1rem}
     <button role="tab" data-tab="ann" aria-selected="false">Announcements</button>
     <button role="tab" data-tab="rep" aria-selected="false">Reports</button>
   </div>
-  <div id="p-dash"></div><div id="p-members" hidden></div><div id="p-pay" hidden></div><div id="p-watch" hidden></div><div id="p-cases" hidden></div><div id="p-exp" hidden></div><div id="p-ann" hidden></div><div id="p-rep" hidden></div>
+  <div id="p-dash"></div><div id="p-members" hidden></div><div id="p-pay" hidden></div><div id="p-watch" hidden></div><div id="p-cases" hidden></div><div id="p-exp" hidden></div><div id="p-ann" hidden></div><div id="p-rep" hidden></div><div id="p-prof" hidden></div>
 </section>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
@@ -76,7 +76,7 @@ function tag(s){return `<span class="tag t-${esc(s)}">${esc(s)}</span>`}
 
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('[data-tab]').forEach(x=>x.setAttribute('aria-selected',x===b));
-  for(const t of ['dash','members','pay','watch','cases','exp','ann','rep'])$('p-'+t).hidden=t!==b.dataset.tab});
+  for(const t of ['dash','members','pay','watch','cases','exp','ann','rep','prof'])$('p-'+t).hidden=t!==b.dataset.tab});
 $('f-login').onsubmit=e=>{e.preventDefault();run(async()=>{const{error}=await db.auth.signInWithPassword({email:$('l-email').value.trim(),password:$('l-pass').value});if(error)throw error})};
 $('logout').onclick=()=>db.auth.signOut();
 db.auth.onAuthStateChange((ev,s)=>{
@@ -93,27 +93,28 @@ async function refresh(){await membersTab();await Promise.all([dash(),payTab(),w
 
 async function dash(){
   const d=await rpc('admin_dashboard');
-  const S=(l,v)=>`<div class="stat"><small>${l}</small><b>${v}</b></div>`;
-  $('p-dash').innerHTML=`<div class="card"><h2>Members</h2><div class="stats">${S('Registered people',d.members_total)}${S('Active memberships',d.active)}${S('Deregistered',d.deregistered)}${S('Re-registered (active)',d.re_registered)}</div></div>
-  <div class="card"><h2>Money</h2><div class="stats">${S('Monthly contributions',money(d.monthly_total))}${S('Registration fees',money(d.registration_total))}${S('Special contributions',money(d.special_total))}${S('Outstanding',money(d.outstanding))}${S('Paid in advance',money(d.advance))}${S('Total expenses',money(d.expenses_total))}</div></div>
-  <div class="card"><h2>Cases and approvals</h2><div class="stats">${S('Open welfare cases',d.cases_open)}${S('Closed welfare cases',d.cases_closed)}${S('Payments waiting for approval',d.pending_payments)}</div></div>
+  const S=(l,v,g)=>`<div class="stat${g?' link':''}"${g?` data-g="${g}" role="button" tabindex="0"`:''}><small>${l}${g?' ›':''}</small><b>${v}</b></div>`;
+  $('p-dash').innerHTML=`<div class="card"><h2>Members</h2><div class="stats">${S('Registered people',d.members_total,'m:')}${S('Active memberships',d.active,'m:active')}${S('Deregistered',d.deregistered,'m:deregistered')}${S('Re-registered (active)',d.re_registered,'m:re')}</div></div>
+  <div class="card"><h2>Money</h2><div class="stats">${S('Monthly contributions',money(d.monthly_total),'r:income')}${S('Registration fees',money(d.registration_total),'r:registration')}${S('Special contributions',money(d.special_total),'r:special')}${S('Outstanding',money(d.outstanding),'r:arrears')}${S('Paid in advance',money(d.advance),'r:advance')}${S('Total expenses',money(d.expenses_total),'r:expenses')}</div></div>
+  <div class="card"><h2>Cases and approvals</h2><div class="stats">${S('Open welfare cases',d.cases_open,'c:open')}${S('Closed welfare cases',d.cases_closed,'c:closed')}${S('Payments waiting for approval',d.pending_payments,'p:')}</div></div>
   <div class="card"><h2>Recent transactions</h2><div class="scroll"><table><thead><tr><th>Date</th><th>From</th><th>For</th><th>Amount</th><th>Code</th><th>Status</th></tr></thead><tbody>
-  ${d.recent_payments.map(p=>`<tr><td>${fdate(p.paid_on)}</td><td>${esc(p.who)}</td><td>${KIND[p.kind]}</td><td>${money(p.amount)}</td><td>${esc(p.reference)}</td><td>${tag(p.status)}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">No transactions yet.</td></tr>'}</tbody></table></div></div>`}
+  ${d.recent_payments.map(p=>`<tr><td>${fdate(p.paid_on)}</td><td>${esc(p.who)}</td><td>${KIND[p.kind]}</td><td>${money(p.amount)}</td><td>${esc(p.reference)}</td><td>${tag(p.status)}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">No transactions yet.</td></tr>'}</tbody></table></div></div>`;
+  document.querySelectorAll('[data-g]').forEach(b=>{const go=()=>jump(b.dataset.g);b.onclick=go;b.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}}})}
 
 async function membersTab(){
   const{data,error}=await db.from('v_admin_members').select('*').order('full_name');if(error)throw error;members=data;
   $('p-members').innerHTML=`<div class="card"><h2>Members</h2><div class="grid2">
    <div><label for="q">Search name, phone or number</label><input id="q"></div>
-   <div><label for="sf">Show</label><select id="sf"><option value="">Everyone</option><option value="active">Active</option><option value="deregistered">Deregistered</option><option value="none">Awaiting membership</option><option value="arrears">In arrears</option><option value="advance">Paid in advance</option></select></div></div>
+   <div><label for="sf">Show</label><select id="sf"><option value="">Everyone</option><option value="active">Active</option><option value="deregistered">Deregistered</option><option value="re">Re-registered</option><option value="none">Awaiting membership</option><option value="arrears">In arrears</option><option value="advance">Paid in advance</option></select></div></div>
    <div class="scroll" style="margin-top:1rem"><table><thead><tr><th>Name</th><th>Phone</th><th>Number</th><th>Status</th><th>Joined</th><th>Outstanding</th><th>Advance</th><th></th></tr></thead><tbody id="mrows"></tbody></table></div></div>`;
   $('q').oninput=$('sf').onchange=drawMembers;drawMembers()}
 function drawMembers(){
   const q=$('q').value.toLowerCase(),f=$('sf').value;
   $('mrows').innerHTML=members.filter(m=>{
     if(q&&!`${m.full_name} ${m.phone||''} ${m.number||''}`.toLowerCase().includes(q))return false;
-    if(f==='active')return m.status==='active';if(f==='deregistered')return m.status==='deregistered';
+    if(f==='re')return m.category==='re_registered'&&m.status==='active';if(f==='active')return m.status==='active';if(f==='deregistered')return m.status==='deregistered';
     if(f==='none')return !m.membership_id;if(f==='arrears')return Number(m.outstanding)>0;if(f==='advance')return Number(m.advance_paid)>0;return true})
-   .map(m=>`<tr><td>${esc(m.full_name)}<br><span class="muted">${esc(m.email)}</span></td><td>${esc(m.phone)}</td><td>${esc(m.number||'')}</td><td>${m.status?tag(m.status):'<span class="muted">Awaiting</span>'}</td><td>${fdate(m.joined_on)}</td><td>${m.membership_id?money(m.outstanding):''}</td><td>${m.membership_id?money(m.advance_paid):''}</td>
+   .map(m=>`<tr><td><a href="#" data-prof="${esc(m.member_id)}">${esc(m.full_name)}</a><br><span class="muted">${esc(m.email)}</span></td><td>${esc(m.phone)}</td><td>${esc(m.number||'')}</td><td>${m.status?tag(m.status):'<span class="muted">Awaiting</span>'}</td><td>${fdate(m.joined_on)}</td><td>${m.membership_id?money(m.outstanding):''}</td><td>${m.membership_id?money(m.advance_paid):''}</td>
    <td>${m.status==='active'?`<button class="sm danger" data-dereg="${esc(m.membership_id)}" data-n="${esc(m.full_name)}">Deregister</button>`:(m.status==='deregistered'&&m.reinstate_until&&m.reinstate_until>=today())?`<button class="sm" data-rein="${esc(m.membership_id)}" data-n="${esc(m.full_name)}">Reinstate</button><br><span class="muted">until ${fdate(m.reinstate_until)}</span>`:`<button class="sm" data-reg="${esc(m.member_id)}" data-re="${m.membership_id?1:''}" data-n="${esc(m.full_name)}">${m.membership_id?'Re-register':'Register'}</button>`}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No members match.</td></tr>';
   document.querySelectorAll('[data-reg]').forEach(b=>b.onclick=()=>run(async()=>{
     const d=prompt(`Joining date for ${b.dataset.n} (YYYY-MM-DD). It can be a past date.`,today());if(!d)return;
@@ -135,7 +136,8 @@ function drawMembers(){
     const code=prompt('Transaction code for this payment:');if(!code)return;
     const meth=prompt('Payment method (M-Pesa, Bank or Cash):','M-Pesa');if(!meth)return;
     const r=await rpc('reinstate_membership',{p_membership_id:b.dataset.rein,p_amount_received:+amt,p_method:meth,p_reference:code.trim(),p_paid_on:today()});
-    say(`${b.dataset.n} reinstated on ${r.number}.`);await refresh()}))}
+    say(`${b.dataset.n} reinstated on ${r.number}.`);await refresh()}));
+  document.querySelectorAll('[data-prof]').forEach(a=>a.onclick=e=>{e.preventDefault();run(()=>profile(a.dataset.prof))})}
 
 async function payTab(){
   const{data,error}=await db.from('v_admin_payments').select('*').order('created_at',{ascending:false}).limit(300);if(error)throw error;
@@ -175,11 +177,11 @@ async function watch(){
 
 const CT={bereavement:'Bereavement',medical:'Medical',education:'Education',emergency:'Emergency',other:'Other'};
 const CATS=['Bereavement support','Medical assistance','Education support','Meetings','Administration','Other'];
-let editCase=null,editExp=null,editAnn=null,expF={from:'',to:'',cat:''};
+let editCase=null,editExp=null,editAnn=null,expF={from:'',to:'',cat:''},caseF='';
 
 async function casesTab(){
   const{data,error}=await db.from('v_case_progress').select('*').order('status').order('case_date',{ascending:false});if(error)throw error;
-  const x=editCase||{};
+  const x=editCase||{},list=caseF?data.filter(c=>c.status===caseF):data;
   $('p-cases').innerHTML=`<div class="card"><h2>${x.id?'Edit welfare case':'New welfare case'}</h2><form id="f-case"><div class="grid2">
    <div><label for="ct">Case type</label><select id="ct">${Object.entries(CT).map(([k,v])=>`<option value="${k}"${x.case_type===k?' selected':''}>${v}</option>`).join('')}</select></div>
    <div><label for="cb">Beneficiary name</label><input id="cb" value="${esc(x.beneficiary_name)}" required></div>
@@ -188,14 +190,15 @@ async function casesTab(){
    <div><label for="cg">Target amount (KSh, optional)</label><input id="cg" type="number" min="1" step="1" value="${esc(x.target_amount||'')}"></div></div>
    <label for="cdt">Details and reason for the appeal</label><textarea id="cdt" rows="3">${esc(x.details)}</textarea>
    <button type="submit">${x.id?'Save changes':'Create case'}</button>${x.id?' <button type="button" id="cx" class="ghost">Cancel</button>':''}</form></div>
-   <div class="card"><h2>All welfare cases</h2><p class="muted">To record a contribution to a case, use the Payments tab and choose the case.</p><div class="scroll"><table><thead><tr><th>Case</th><th>Type</th><th>Date</th><th>Target</th><th>Collected</th><th>Remaining</th><th>Status</th><th></th></tr></thead><tbody>
-   ${data.map(c=>`<tr><td>${esc(c.title)}<br><span class="muted">${esc(c.beneficiary_name)}</span></td><td>${CT[c.case_type]}</td><td>${fdate(c.case_date)}</td><td>${c.target_amount?money(c.target_amount):'None'}</td><td>${money(c.collected)}${c.percent!=null?` (${c.percent}%)`:''}</td><td>${c.remaining!=null?money(c.remaining):''}</td><td>${tag(c.status)}</td>
+   <div class="card"><h2>All welfare cases</h2><div class="grid2"><div><label for="cf">Show</label><select id="cf"><option value="">All cases</option><option value="open"${caseF==='open'?' selected':''}>Open</option><option value="closed"${caseF==='closed'?' selected':''}>Closed</option></select></div></div><p class="muted">To record a contribution to a case, use the Payments tab and choose the case.</p><div class="scroll"><table><thead><tr><th>Case</th><th>Type</th><th>Date</th><th>Target</th><th>Collected</th><th>Remaining</th><th>Status</th><th></th></tr></thead><tbody>
+   ${list.map(c=>`<tr><td>${esc(c.title)}<br><span class="muted">${esc(c.beneficiary_name)}</span></td><td>${CT[c.case_type]}</td><td>${fdate(c.case_date)}</td><td>${c.target_amount?money(c.target_amount):'None'}</td><td>${money(c.collected)}${c.percent!=null?` (${c.percent}%)`:''}</td><td>${c.remaining!=null?money(c.remaining):''}</td><td>${tag(c.status)}</td>
    <td><button class="sm ghost" data-ce="${c.id}">Edit</button> <button class="sm ghost" data-cv="${c.id}">Contributions</button> <button class="sm" data-cs="${c.id}" data-st="${c.status}">${c.status==='open'?'Close':'Reopen'}</button> <button class="sm danger" data-cdel="${c.id}">Delete</button></td></tr>`).join('')||'<tr><td colspan="8" class="muted">No cases yet.</td></tr>'}</tbody></table></div></div><div id="cc"></div>`;
   $('f-case').onsubmit=e=>{e.preventDefault();run(async()=>{
     const row={case_type:$('ct').value,beneficiary_name:$('cb').value.trim(),title:$('cti').value.trim(),details:$('cdt').value.trim(),case_date:$('cd').value,target_amount:$('cg').value?+$('cg').value:null};
     const r=x.id?await db.from('welfare_cases').update(row).eq('id',x.id):await db.from('welfare_cases').insert(row);if(r.error)throw r.error;
     say(x.id?'Case updated.':'Case created. Active members can now see it.');editCase=null;await refresh()})};
   if($('cx'))$('cx').onclick=()=>{editCase=null;casesTab()};
+  $('cf').onchange=()=>{caseF=$('cf').value;casesTab()};
   document.querySelectorAll('[data-ce]').forEach(b=>b.onclick=()=>{editCase=data.find(c=>c.id===b.dataset.ce);casesTab().then(()=>scrollTo(0,0))});
   document.querySelectorAll('[data-cs]').forEach(b=>b.onclick=()=>run(async()=>{const st=b.dataset.st==='open'?'closed':'open';
     const r=await db.from('welfare_cases').update({status:st}).eq('id',b.dataset.cs);if(r.error)throw r.error;say(st==='closed'?'Case closed.':'Case reopened.');await refresh()}));
@@ -330,6 +333,41 @@ async function repTab(){
       drawRep(k,await REP[k].run(f))})}}
   const cur=$('rmem').value;
   $('rmem').innerHTML='<option value="">All members</option>'+members.map(m=>`<option value="${esc(m.member_id)}">${esc(m.full_name)}${m.number?' ('+esc(m.number)+')':''}</option>`).join('');$('rmem').value=cur}
+
+const goTab=t=>document.querySelector(`[data-tab="${t}"]`).click();
+function jump(g){
+  const[t,v]=g.split(':');
+  if(t==='m'){goTab('members');$('sf').value=v;$('q').value='';drawMembers()}
+  else if(t==='r'){goTab('rep');$('rt').value=v;$('rt').dispatchEvent(new Event('change'));$('rf').value='2000-01-01';$('rto').value=today();$('rmem').value='';$('rmo').value='';$('rc2').value='';$('f-rep').requestSubmit()}
+  else if(t==='c'){goTab('cases');caseF=v;casesTab()}
+  else if(t==='p'){goTab('pay')}}
+
+async function profile(id){
+  const[mr,ms,pm,mo,cs]=await Promise.all([
+    db.from('members').select('*').eq('id',id).single(),
+    db.from('memberships').select('*').eq('member_id',id).order('created_at',{ascending:false}),
+    db.from('v_admin_payments').select('*').eq('member_id',id).order('paid_on',{ascending:false}),
+    fetchAll(()=>db.from('v_report_months').select('*').eq('member_id',id).order('period').order('membership_id')),
+    db.from('v_case_progress').select('id,title')]);
+  for(const r of [mr,ms,pm])if(r.error)throw r.error;
+  const ids=ms.data.map(x=>x.id),ev=ids.length?(await db.from('membership_events').select('*').in('membership_id',ids).order('created_at',{ascending:false})).data||[]:[];
+  const m=mr.data,cm=Object.fromEntries((cs.data||[]).map(c=>[c.id,c.title])),num=Object.fromEntries(ms.data.map(x=>[x.id,x.number])),cur=ms.data.find(x=>x.status==='active')||ms.data[0];
+  const g=new Map();mo.forEach(r=>{const k=r.number+'|'+r.period.slice(0,4);if(!g.has(k))g.set(k,{n:r.number,y:r.period.slice(0,4),a:0,b:0,c:0,d:0});const o=g.get(k);
+    if(r.period<=curM()){o.a+=+r.due_amount;o.b+=+r.paid;o.c+=Math.max(r.due_amount-r.paid,0)}else o.d+=+r.paid});
+  const yrs=[...g.values()].sort((x,y)=>y.y-x.y||String(x.n).localeCompare(y.n)),paid=pm.data.filter(p=>p.status==='approved').reduce((a,p)=>a+Number(p.amount),0);
+  const S=(l,v)=>`<div class="stat"><small>${l}</small><b>${v}</b></div>`;
+  $('p-prof').innerHTML=`<p><button id="pb" class="ghost sm">← Back to members</button></p>
+   <div class="card"><h2>${esc(m.full_name)}</h2><div class="stats">${S('Current membership',esc(cur?.number||'None yet'))}${S('Status',cur?tag(cur.status):'Awaiting')}${S('Total approved payments',money(paid))}${S('Outstanding',money(yrs.reduce((a,o)=>a+o.c,0)))}${S('Paid in advance',money(yrs.reduce((a,o)=>a+o.d,0)))}</div>
+   <form id="f-prof" style="margin-top:1rem"><div class="grid2"><div><label for="pn">Full name</label><input id="pn" value="${esc(m.full_name)}" required></div><div><label for="pp">Phone</label><input id="pp" value="${esc(m.phone)}"></div><div><label>Login email (not changed here)</label><input value="${esc(m.email)}" disabled></div></div><button type="submit">Save details</button></form></div>
+   <div class="card"><h2>Membership periods</h2><div class="scroll"><table><thead><tr><th>Number</th><th>Type</th><th>Joined</th><th>Status</th><th>Ended</th><th>Reason</th><th>Reinstate by</th></tr></thead><tbody>${ms.data.map(x=>`<tr><td>${esc(x.number)}</td><td>${x.category==='original'?'Original':'Re-registered'}</td><td>${fdate(x.joined_on)}</td><td>${tag(x.status)}</td><td>${fdate(x.deregistered_on)}</td><td style="white-space:normal">${esc(x.deregistration_reason)}</td><td>${fdate(x.reinstate_until)}</td></tr>`).join('')||'<tr><td colspan="7" class="muted">Not registered yet.</td></tr>'}</tbody></table></div></div>
+   <div class="card"><h2>Contributions by year</h2><div class="scroll"><table><thead><tr><th>Year</th><th>Membership</th><th>Expected to date</th><th>Paid</th><th>Outstanding</th><th>Paid in advance</th></tr></thead><tbody>${yrs.map(o=>`<tr><td>${o.y}</td><td>${esc(o.n)}</td><td>${money(o.a)}</td><td>${money(o.b)}</td><td>${money(o.c)}</td><td>${money(o.d)}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">No contribution months yet.</td></tr>'}</tbody></table></div></div>
+   <div class="card"><h2>All payments</h2><div class="scroll"><table><thead><tr><th>Date</th><th>For</th><th>Welfare case</th><th>Membership</th><th>Amount</th><th>Method</th><th>Code</th><th>Status</th></tr></thead><tbody>${pm.data.map(p=>`<tr><td>${fdate(p.paid_on)}</td><td>${KIND[p.kind]}</td><td>${esc(cm[p.case_id]||'')}</td><td>${esc(p.number||'')}</td><td>${money(p.amount)}</td><td>${esc(p.method)}</td><td>${esc(p.reference)}</td><td>${tag(p.status)}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No payments yet.</td></tr>'}</tbody></table></div></div>
+   <div class="card"><h2>History of changes</h2><div class="scroll"><table><thead><tr><th>Date</th><th>Membership</th><th>Event</th><th>Note</th></tr></thead><tbody>${ev.map(x=>`<tr><td>${fdate(x.created_at)}</td><td>${esc(num[x.membership_id])}</td><td>${esc(x.event)}</td><td style="white-space:normal">${esc(x.note)}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">Nothing recorded.</td></tr>'}</tbody></table></div></div>`;
+  document.querySelectorAll('[data-tab]').forEach(x=>x.setAttribute('aria-selected','false'));
+  for(const t of ['dash','members','pay','watch','cases','exp','ann','rep'])$('p-'+t).hidden=true;
+  $('p-prof').hidden=false;scrollTo(0,0);
+  $('pb').onclick=()=>goTab('members');
+  $('f-prof').onsubmit=e=>{e.preventDefault();run(async()=>{const w=await db.from('members').update({full_name:$('pn').value.trim(),phone:$('pp').value.trim()}).eq('id',id);if(w.error)throw w.error;say('Details saved.');await membersTab();await profile(id)})}}
 
 if(!KAWUOR_CONFIG.url||KAWUOR_CONFIG.url.includes('YOUR-PROJECT'))say('Setup needed: add your Supabase URL and key to config.js.',true);
 </script>
