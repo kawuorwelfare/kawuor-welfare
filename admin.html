@@ -30,11 +30,12 @@ form button[type=submit]{margin-top:1rem}
 .scroll{overflow-x:auto}table{width:100%;border-collapse:collapse}td,th{padding:.5rem;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
 .tag{padding:.1rem .5rem;border-radius:1rem;border:1px solid var(--line);font-size:.85rem}
 .t-active,.t-approved{color:var(--ok);border-color:var(--ok)}.t-pending,.t-approaching{color:var(--warn);border-color:var(--warn)}.t-deregistered,.t-rejected,.t-reversed,.t-defaulted{color:var(--bad);border-color:var(--bad)}
-.t-open,.t-published{color:var(--ok);border-color:var(--ok)}.t-closed,.t-draft,.t-expired{color:var(--muted)}.muted{color:var(--muted)}[hidden]{display:none!important}
+.t-open,.t-published{color:var(--ok);border-color:var(--ok)}.t-closed,.t-draft,.t-expired{color:var(--muted)}@media print{header,.tabs,#msg,.noprint{display:none!important}body{background:#fff;color:#000}.card{border:0;padding:0}}
+.muted{color:var(--muted)}[hidden]{display:none!important}
 </style>
 </head>
 <body>
-<header><div class="wrap"><b>KAWUOR WELFARE · Administration</b><span><a class="btn ghost sm" href="index.html">Member portal</a> <button id="logout" class="ghost sm" hidden>Log out</button></span></div></header>
+<header><div class="wrap"><b>KAWUOR WELFARE · Administration</b> <small class="muted">version 7 · reports</small><span><a class="btn ghost sm" href="index.html">Member portal</a> <button id="logout" class="ghost sm" hidden>Log out</button></span></div></header>
 <main class="wrap">
 <div id="msg" role="status" hidden></div>
 <form id="f-login" class="card" hidden><h2>Administrator login</h2>
@@ -50,8 +51,9 @@ form button[type=submit]{margin-top:1rem}
     <button role="tab" data-tab="cases" aria-selected="false">Welfare cases</button>
     <button role="tab" data-tab="exp" aria-selected="false">Expenses</button>
     <button role="tab" data-tab="ann" aria-selected="false">Announcements</button>
+    <button role="tab" data-tab="rep" aria-selected="false">Reports</button>
   </div>
-  <div id="p-dash"></div><div id="p-members" hidden></div><div id="p-pay" hidden></div><div id="p-watch" hidden></div><div id="p-cases" hidden></div><div id="p-exp" hidden></div><div id="p-ann" hidden></div>
+  <div id="p-dash"></div><div id="p-members" hidden></div><div id="p-pay" hidden></div><div id="p-watch" hidden></div><div id="p-cases" hidden></div><div id="p-exp" hidden></div><div id="p-ann" hidden></div><div id="p-rep" hidden></div>
 </section>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
@@ -74,7 +76,7 @@ function tag(s){return `<span class="tag t-${esc(s)}">${esc(s)}</span>`}
 
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('[data-tab]').forEach(x=>x.setAttribute('aria-selected',x===b));
-  for(const t of ['dash','members','pay','watch','cases','exp','ann'])$('p-'+t).hidden=t!==b.dataset.tab});
+  for(const t of ['dash','members','pay','watch','cases','exp','ann','rep'])$('p-'+t).hidden=t!==b.dataset.tab});
 $('f-login').onsubmit=e=>{e.preventDefault();run(async()=>{const{error}=await db.auth.signInWithPassword({email:$('l-email').value.trim(),password:$('l-pass').value});if(error)throw error})};
 $('logout').onclick=()=>db.auth.signOut();
 db.auth.onAuthStateChange((ev,s)=>{
@@ -87,7 +89,7 @@ async function start(){await run(async()=>{
   if(!r.data||r.data.role!=='admin'){$('f-login').hidden=true;$('app').hidden=true;$('logout').hidden=false;say('This page is for administrators only. Your account is not an administrator.',true);return}
   $('f-login').hidden=true;$('app').hidden=false;$('logout').hidden=false;started=true;
   await refresh()})}
-async function refresh(){await membersTab();await Promise.all([dash(),payTab(),watch(),casesTab(),expTab(),annTab()])}
+async function refresh(){await membersTab();await Promise.all([dash(),payTab(),watch(),casesTab(),expTab(),annTab(),repTab()])}
 
 async function dash(){
   const d=await rpc('admin_dashboard');
@@ -234,6 +236,82 @@ async function annTab(){
     const w=await db.from('announcements').update(row).eq('id',b.dataset.apub);if(w.error)throw w.error;say(on?'Published.':'Unpublished.');await annTab()}));
   document.querySelectorAll('[data-ad]').forEach(b=>b.onclick=()=>run(async()=>{if(!confirm('Remove this announcement?'))return;
     const w=await db.from('announcements').delete().eq('id',b.dataset.ad);if(w.error)throw w.error;say('Announcement removed.');await annTab()}))}
+
+const RL={monthly:'Monthly contributions',registration:'Registration fees',special:'Special welfare contributions'};
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const curM=()=>today().slice(0,7)+'-01',fmtM=d=>MON[+d.slice(5,7)-1]+' '+d.slice(0,4);
+async function fetchAll(make){let out=[],from=0;for(;;){const{data,error}=await make().range(from,from+999);if(error)throw error;out=out.concat(data);if(data.length<1000)break;from+=1000}return out}
+const sum=(rows,i)=>rows.reduce((a,r)=>a+Number(r[i]||0),0);
+const grp=(rows,fn)=>{const m=new Map();rows.forEach(r=>{if(!m.has(r.membership_id))m.set(r.membership_id,{number:r.number,name:r.full_name,months:0,a:0,b:0,c:0,d:0});fn(m.get(r.membership_id),r)});return[...m.values()].sort((x,y)=>String(x.number).localeCompare(String(y.number)))};
+const monthsQ=(f,fromP,toP)=>()=>{let b=db.from('v_report_months').select('*').order('period').order('membership_id');if(fromP)b=b.gte('period',fromP);if(toP)b=b.lte('period',toP);if(f.member)b=b.eq('member_id',f.member);return b};
+const payQ=(f,kind)=>()=>{let b=db.from('v_admin_payments').select('*').eq('kind',kind).eq('status','approved').gte('paid_on',f.from).lte('paid_on',f.to).order('paid_on').order('id');if(f.member)b=b.eq('member_id',f.member);return b};
+const range=f=>fdate(f.from)+' to '+fdate(f.to);
+const REP={
+ register:{t:'Membership register',u:'Member (optional)',run:async f=>{
+  const d=(await fetchAll(()=>db.from('v_admin_members').select('*').order('full_name').order('member_id'))).filter(r=>!f.member||r.member_id===f.member);
+  const rows=d.map(r=>[r.number||'',r.full_name,r.phone,r.email,r.status||'awaiting',r.category||'',r.joined_on,r.outstanding||0,r.advance_paid||0]);
+  return{cols:[['Number'],['Name'],['Phone'],['Email'],['Status'],['Category'],['Joined','d'],['Outstanding','m'],['Advance','m']],rows,totals:[rows.length+' people',null,null,null,null,null,null,sum(rows,7),sum(rows,8)],desc:'All members'}}},
+ monthly:{t:'Monthly contributions',u:'Year, month, member (optional)',run:async f=>{
+  const d=await fetchAll(monthsQ(f,f.month?`${f.year}-${f.month}-01`:f.year+'-01-01',f.month?`${f.year}-${f.month}-01`:f.year+'-12-01'));
+  const rows=d.map(r=>[r.number,r.full_name,r.period,r.due_amount,r.paid,Math.max(r.due_amount-r.paid,0),r.status]);
+  return{cols:[['Number'],['Name'],['Month','mo'],['Due','m'],['Paid','m'],['Balance','m'],['Status']],rows,totals:['Total',null,null,sum(rows,3),sum(rows,4),sum(rows,5),null],desc:'Year '+f.year+(f.month?', '+MON[+f.month-1]:'')}}},
+ annual:{t:'Annual contributions',u:'Year, member (optional)',run:async f=>{
+  const d=await fetchAll(monthsQ(f,f.year+'-01-01',f.year+'-12-01'));
+  const rows=grp(d,(o,r)=>{if(r.period<=curM()){o.a+=+r.due_amount;o.b+=+r.paid;o.c+=Math.max(r.due_amount-r.paid,0)}else o.d+=+r.paid}).map(o=>[o.number,o.name,o.a,o.b,o.c,o.d]);
+  return{cols:[['Number'],['Name'],['Expected to date','m'],['Paid','m'],['Outstanding','m'],['Paid in advance','m']],rows,totals:['Total',null,sum(rows,2),sum(rows,3),sum(rows,4),sum(rows,5)],desc:'Year '+f.year+' (expected counts months up to the current month)'}}},
+ arrears:{t:'Member arrears',u:'Member (optional)',run:async f=>{
+  const d=(await fetchAll(monthsQ(f,null,curM()))).filter(r=>r.status==='unpaid'||r.status==='partial');
+  const rows=grp(d,(o,r)=>{o.months++;o.a+=Math.max(r.due_amount-r.paid,0)}).map(o=>[o.number,o.name,o.months,o.a]).sort((x,y)=>y[3]-x[3]);
+  return{cols:[['Number'],['Name'],['Months in arrears','n'],['Outstanding','m']],rows,totals:['Total',null,sum(rows,2),sum(rows,3)],desc:'All years, up to '+fmtM(curM())}}},
+ advance:{t:'Advance payments',u:'Member (optional)',run:async f=>{
+  const d=(await fetchAll(monthsQ(f,null,null))).filter(r=>r.period>curM()&&Number(r.paid)>0);
+  const rows=grp(d,(o,r)=>{o.months++;o.a+=+r.paid}).map(o=>[o.number,o.name,o.months,o.a]);
+  return{cols:[['Number'],['Name'],['Future months covered','n'],['Amount held','m']],rows,totals:['Total',null,sum(rows,2),sum(rows,3)],desc:'Payments held for months after '+fmtM(curM())}}},
+ registration:{t:'Registration fees',u:'From and to dates, member (optional)',run:async f=>{
+  const rows=(await fetchAll(payQ(f,'registration'))).map(r=>[r.paid_on,r.who,r.number||'',r.amount,r.method,r.reference]);
+  return{cols:[['Date','d'],['Member'],['Number'],['Amount','m'],['Method'],['Code']],rows,totals:['Total',null,null,sum(rows,3),null,null],desc:range(f)}}},
+ special:{t:'Special welfare contributions',u:'From and to dates, member (optional)',run:async f=>{
+  const cs=await fetchAll(()=>db.from('v_case_progress').select('id,title').order('id')),cm=Object.fromEntries(cs.map(c=>[c.id,c.title]));
+  const rows=(await fetchAll(payQ(f,'special'))).map(r=>[r.paid_on,r.who,cm[r.case_id]||'General',r.amount,r.method,r.reference]);
+  return{cols:[['Date','d'],['From'],['Welfare case'],['Amount','m'],['Method'],['Code']],rows,totals:['Total',null,null,sum(rows,3),null,null],desc:range(f)}}},
+ cases:{t:'Welfare cases',u:'From and to dates (case date)',run:async f=>{
+  const rows=(await fetchAll(()=>db.from('v_case_progress').select('*').gte('case_date',f.from).lte('case_date',f.to).order('case_date').order('id'))).map(c=>[c.title,c.beneficiary_name,CT[c.case_type],c.case_date,c.target_amount,c.collected,c.remaining,c.status]);
+  return{cols:[['Case'],['Beneficiary'],['Type'],['Date','d'],['Target','m'],['Collected','m'],['Remaining','m'],['Status']],rows,totals:['Total',null,null,null,sum(rows,4),sum(rows,5),sum(rows,6),null],desc:range(f)}}},
+ expenses:{t:'Welfare expenses',u:'From and to dates, category (optional)',run:async f=>{
+  const rows=(await fetchAll(()=>{let b=db.from('expenses').select('*').gte('spent_on',f.from).lte('spent_on',f.to).order('spent_on').order('id');if(f.cat)b=b.eq('category',f.cat);return b})).map(r=>[r.spent_on,r.category,r.description,r.payee,r.amount]);
+  return{cols:[['Date','d'],['Category'],['Description'],['Paid to'],['Amount','m']],rows,totals:['Total',null,null,null,sum(rows,4)],desc:range(f)+(f.cat?', '+f.cat:'')}}},
+ income:{t:'Income and expenditure',u:'From and to dates',run:async f=>{
+  const r=await rpc('admin_income_expenditure',{p_from:f.from,p_to:f.to}),ti=r.income.reduce((a,x)=>a+Number(x.total),0),te=r.expenses.reduce((a,x)=>a+Number(x.total),0);
+  const rows=[...r.income.map(x=>['Income',RL[x.kind]||x.kind,x.total]),['Total income','',ti],...r.expenses.map(x=>['Expenditure',x.category,x.total]),['Total expenditure','',te],[ti>=te?'Surplus':'Deficit','',Math.abs(ti-te)]];
+  return{cols:[['Section'],['Item'],['Amount','m']],rows,totals:null,desc:range(f)+'. Income is approved payments by date paid.'}}}
+};
+const fm=(c,v)=>v===null||v===undefined||v===''?'':c==='m'?money(v):c==='d'?fdate(v):c==='mo'?fmtM(v):esc(v);
+let lastRep=null;
+function drawRep(k,r){
+  const tr=(cells)=>`<tr>${cells.map((v,i)=>`<td${['m','n'].includes(r.cols[i][1])?' style="text-align:right"':''}>${fm(r.cols[i][1],v)}</td>`).join('')}</tr>`;
+  $('rout').innerHTML=`<div class="card"><div class="noprint" style="float:right"><button id="rp" class="ghost sm">Print</button> <button id="rcsv" class="sm">Download CSV</button></div>
+   <h2>KAWUOR WELFARE</h2><h3 style="margin:.2rem 0">${esc(REP[k].t)}</h3><p class="muted">${esc(r.desc)} · Generated ${fdate(today())}</p>
+   <div class="scroll"><table><thead><tr>${r.cols.map(c=>`<th>${esc(c[0])}</th>`).join('')}</tr></thead><tbody>${r.rows.map(tr).join('')||`<tr><td colspan="${r.cols.length}" class="muted">No records for these filters.</td></tr>`}</tbody>${r.totals?`<tfoot>${tr(r.totals).replace(/<td/g,'<td style="font-weight:700"')}</tfoot>`:''}</table></div></div>`;
+  $('rp').onclick=()=>print();
+  $('rcsv').onclick=()=>{const q=v=>`"${String(v??'').replace(/"/g,'""')}"`,all=[r.cols.map(c=>c[0]),...r.rows,...(r.totals?[r.totals]:[])];
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+all.map(x=>x.map(q).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));a.download=`kawuor-${k}-${today()}.csv`;document.body.appendChild(a);a.click();a.remove()}}
+async function repTab(){
+  if(!$('f-rep')){
+    const y=+today().slice(0,4),yrs=[y+1,y,y-1,y-2,y-3].map(v=>`<option${v===y?' selected':''}>${v}</option>`).join('');
+    $('p-rep').innerHTML=`<div class="card noprint"><h2>Reports</h2><form id="f-rep"><div class="grid2">
+     <div><label for="rt">Report</label><select id="rt">${Object.entries(REP).map(([k,v])=>`<option value="${k}">${v.t}</option>`).join('')}</select><span id="ru" class="muted"></span></div>
+     <div><label for="rf">From</label><input id="rf" type="date" value="${y}-01-01"></div><div><label for="rto">To</label><input id="rto" type="date" value="${today()}"></div>
+     <div><label for="ry">Year</label><select id="ry">${yrs}</select></div>
+     <div><label for="rmo">Month</label><select id="rmo"><option value="">All months</option>${MON.map((m,i)=>`<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('')}</select></div>
+     <div><label for="rmem">Member</label><select id="rmem"></select></div>
+     <div><label for="rc2">Category (expenses only)</label><input id="rc2"></div></div><button type="submit">Show report</button></form></div><div id="rout"></div>`;
+    const hint=()=>$('ru').textContent='Uses: '+REP[$('rt').value].u;$('rt').onchange=hint;hint();
+    $('f-rep').onsubmit=e=>{e.preventDefault();run(async()=>{const k=$('rt').value;
+      const f={from:$('rf').value,to:$('rto').value,year:$('ry').value,month:$('rmo').value,member:$('rmem').value,cat:$('rc2').value.trim()};
+      if(f.from>f.to)throw new Error('The From date must be before the To date.');
+      drawRep(k,await REP[k].run(f))})}}
+  const cur=$('rmem').value;
+  $('rmem').innerHTML='<option value="">All members</option>'+members.map(m=>`<option value="${esc(m.member_id)}">${esc(m.full_name)}${m.number?' ('+esc(m.number)+')':''}</option>`).join('');$('rmem').value=cur}
 
 if(!KAWUOR_CONFIG.url||KAWUOR_CONFIG.url.includes('YOUR-PROJECT'))say('Setup needed: add your Supabase URL and key to config.js.',true);
 </script>
