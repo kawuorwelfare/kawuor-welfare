@@ -35,7 +35,7 @@ form button[type=submit]{margin-top:1rem}
 </style>
 </head>
 <body>
-<header><div class="wrap"><b>KAWUOR WELFARE · Administration</b> <small class="muted">version 7 · reports</small><span><a class="btn ghost sm" href="index.html">Member portal</a> <button id="logout" class="ghost sm" hidden>Log out</button></span></div></header>
+<header><div class="wrap"><b>KAWUOR WELFARE · Administration</b> <small class="muted">version 8 · payment corrections</small><span><a class="btn ghost sm" href="index.html">Member portal</a> <button id="logout" class="ghost sm" hidden>Log out</button></span></div></header>
 <main class="wrap">
 <div id="msg" role="status" hidden></div>
 <form id="f-login" class="card" hidden><h2>Administrator login</h2>
@@ -66,7 +66,7 @@ const fdate=d=>d?new Date(d.slice(0,10)+'T00:00:00').toLocaleDateString('en-GB',
 const today=()=>new Date().toISOString().slice(0,10);
 const KIND={monthly:'Monthly',registration:'Registration',special:'Special'};
 const db=supabase.createClient(KAWUOR_CONFIG.url,KAWUOR_CONFIG.anonKey);
-let uid=null,members=[],started=false;
+let uid=null,members=[],started=false,editPay=null;
 
 function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=t?(bad?'bad':'ok'):'';m.hidden=!t}
 function friendly(e){if(e&&e.code==='23503')return 'This case has contributions recorded, so it cannot be deleted. Close it instead.';if(e&&e.code==='23505')return 'That transaction code has already been recorded.';return (e&&e.message)||'Something went wrong. Please try again.'}
@@ -127,7 +127,7 @@ async function payTab(){
   const pend=data.filter(p=>p.status==='pending');const cs=(await db.from('v_case_progress').select('id,title,beneficiary_name').eq('status','open')).data||[];
   const row=(p,acts)=>`<tr><td>${fdate(p.paid_on)}</td><td>${esc(p.who)}</td><td>${esc(p.number||'')}</td><td>${KIND[p.kind]}</td><td>${money(p.amount)}</td><td>${esc(p.method)}</td><td>${esc(p.reference)}</td><td>${tag(p.status)}${p.review_note?`<br><span class="muted">${esc(p.review_note)}</span>`:''}</td><td>${acts}</td></tr>`;
   const head='<thead><tr><th>Date</th><th>From</th><th>No.</th><th>For</th><th>Amount</th><th>Method</th><th>Code</th><th>Status</th><th></th></tr></thead>';
-  $('p-pay').innerHTML=`<div class="card"><h2>Record a payment</h2><p class="muted">Use this for a payment you have already checked. It is approved and allocated straight away.</p>
+  $('p-pay').innerHTML=`${editPay?`<div class="card" id="fixcard"><h2>Correct a payment</h2><p class="muted">${esc(editPay.who)} · ${KIND[editPay.kind]} · ${editPay.status==='approved'?'This payment is approved. Correcting it reverses the old record and enters a new approved one. Both stay in the history.':'This payment is still waiting for approval, so it is changed in place.'}</p><form id="f-fix"><div class="grid2"><div><label for="xa">Amount (KSh)</label><input id="xa" type="number" min="1" step="1" value="${esc(editPay.amount)}" required></div><div><label for="xd">Date paid</label><input id="xd" type="date" value="${esc(editPay.paid_on)}" required></div><div><label for="xm">Method</label><input id="xm" value="${esc(editPay.method)}"></div><div><label for="xr">Transaction code</label><input id="xr" value="${esc(editPay.reference)}" required></div></div><label for="xn">Reason for correction</label><input id="xn" required><button type="submit">Save correction</button> <button type="button" id="xc" class="ghost">Cancel</button></form></div>`:''}<div class="card"><h2>Record a payment</h2><p class="muted">Use this for a payment you have already checked. It is approved and allocated straight away.</p>
    <form id="f-rec"><div class="grid2"><div><label for="rm">From</label><select id="rm"><option value="">Non-member (voluntary)</option>${members.map(m=>`<option value="${esc(m.member_id)}">${esc(m.full_name)}${m.number?' ('+esc(m.number)+')':''}</option>`).join('')}</select></div>
    <div id="nmw"><label for="nm">Non-member name</label><input id="nm"></div>
    <div><label for="rk">For</label><select id="rk"><option value="monthly">Monthly contribution</option><option value="registration">Registration fee</option><option value="special">Special / welfare contribution</option></select></div>
@@ -135,15 +135,18 @@ async function payTab(){
    <div><label for="rd">Date paid</label><input id="rd" type="date" value="${today()}" required></div>
    <div><label for="rmth">Method</label><select id="rmth"><option>M-Pesa</option><option>Bank</option><option>Cash</option></select></div>
    <div><label for="rr">Transaction code</label><input id="rr" required></div><div id="rcw" hidden><label for="rc">Welfare case (optional)</label><select id="rc"><option value="">General contribution</option>${cs.map(c=>`<option value="${esc(c.id)}">${esc(c.title)} (${esc(c.beneficiary_name)})</option>`).join('')}</select></div></div><button type="submit">Record payment</button></form></div>
-   <div class="card"><h2>Waiting for approval (${pend.length})</h2><div class="scroll"><table>${head}<tbody>${pend.map(p=>row(p,`<button class="sm" data-ap="${p.id}">Approve</button> <button class="sm danger" data-rj="${p.id}">Reject</button>`)).join('')||'<tr><td colspan="9" class="muted">Nothing waiting.</td></tr>'}</tbody></table></div></div>
-   <div class="card"><h2>Latest payments</h2><div class="scroll"><table>${head}<tbody>${data.filter(p=>p.status!=='pending').slice(0,100).map(p=>row(p,p.status==='approved'?`<button class="sm danger" data-rv="${p.id}">Reverse</button>`:'')).join('')}</tbody></table></div></div>`;
+   <div class="card"><h2>Waiting for approval (${pend.length})</h2><div class="scroll"><table>${head}<tbody>${pend.map(p=>row(p,`<button class="sm" data-ap="${p.id}">Approve</button> <button class="sm danger" data-rj="${p.id}">Reject</button> <button class="sm ghost" data-pe="${p.id}">Edit</button>`)).join('')||'<tr><td colspan="9" class="muted">Nothing waiting.</td></tr>'}</tbody></table></div></div>
+   <div class="card"><h2>Latest payments</h2><div class="scroll"><table>${head}<tbody>${data.filter(p=>p.status!=='pending').slice(0,100).map(p=>row(p,p.status==='approved'?`<button class="sm ghost" data-pe="${p.id}">Edit</button> <button class="sm danger" data-rv="${p.id}">Reverse</button>`:'')).join('')}</tbody></table></div></div>`;
   const sync=()=>{const nm=!$('rm').value;$('nmw').hidden=!nm;$('nm').required=nm;if(nm)$('rk').value='special';$('rk').disabled=nm;$('rcw').hidden=(nm?'special':$('rk').value)!=='special'};$('rm').onchange=$('rk').onchange=sync;sync();
   $('f-rec').onsubmit=e=>{e.preventDefault();run(async()=>{const nm=!$('rm').value;
     await rpc('record_payment',{p_member_id:$('rm').value||null,p_kind:nm?'special':$('rk').value,p_amount:+$('ra').value,p_paid_on:$('rd').value,p_method:$('rmth').value,p_reference:$('rr').value.trim(),p_contributor_name:nm?$('nm').value.trim():null,p_case_id:(nm||$('rk').value==='special')&&$('rc').value?$('rc').value:null});
     say('Payment recorded and allocated.');await refresh()})};
   document.querySelectorAll('[data-ap]').forEach(b=>b.onclick=()=>run(async()=>{await rpc('approve_payment',{p_id:b.dataset.ap});say('Payment approved and allocated.');await refresh()}));
   document.querySelectorAll('[data-rj]').forEach(b=>b.onclick=()=>run(async()=>{const r=prompt('Reason for rejecting this payment:');if(!r)return;await rpc('reject_payment',{p_id:b.dataset.rj,p_reason:r});say('Payment rejected.');await refresh()}));
-  document.querySelectorAll('[data-rv]').forEach(b=>b.onclick=()=>run(async()=>{const r=prompt('Reason for reversing this approved payment (it will no longer count):');if(!r)return;await rpc('reverse_payment',{p_id:b.dataset.rv,p_reason:r});say('Payment reversed.');await refresh()}))}
+  document.querySelectorAll('[data-rv]').forEach(b=>b.onclick=()=>run(async()=>{const r=prompt('Reason for reversing this approved payment (it will no longer count):');if(!r)return;await rpc('reverse_payment',{p_id:b.dataset.rv,p_reason:r});say('Payment reversed.');await refresh()}))
+  document.querySelectorAll('[data-pe]').forEach(b=>b.onclick=()=>{editPay=data.find(p=>p.id===b.dataset.pe);payTab().then(()=>scrollTo(0,0))});
+  if($('f-fix')){$('xc').onclick=()=>{editPay=null;payTab()};
+    $('f-fix').onsubmit=e=>{e.preventDefault();run(async()=>{await rpc('correct_payment',{p_id:editPay.id,p_amount:+$('xa').value,p_paid_on:$('xd').value,p_method:$('xm').value.trim(),p_reference:$('xr').value.trim(),p_reason:$('xn').value.trim()});say('Payment corrected.');editPay=null;await refresh()})}}}
 
 async function watch(){
   const{data,error}=await db.from('v_default_watch').select('*').neq('risk','ok').order('consecutive_unpaid',{ascending:false});if(error)throw error;
