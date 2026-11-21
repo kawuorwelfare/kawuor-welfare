@@ -35,7 +35,7 @@ form button[type=submit]{margin-top:1rem}
 </style>
 </head>
 <body>
-<header><div class="wrap"><b>KAWUOR WELFARE · Administration</b> <small class="muted">version 8 · payment corrections</small><span><a class="btn ghost sm" href="index.html">Member portal</a> <button id="logout" class="ghost sm" hidden>Log out</button></span></div></header>
+<header><div class="wrap"><b>KAWUOR WELFARE · Administration</b> <small class="muted">version 9 · re-registration</small><span><a class="btn ghost sm" href="index.html">Member portal</a> <button id="logout" class="ghost sm" hidden>Log out</button></span></div></header>
 <main class="wrap">
 <div id="msg" role="status" hidden></div>
 <form id="f-login" class="card" hidden><h2>Administrator login</h2>
@@ -114,9 +114,17 @@ function drawMembers(){
     if(f==='active')return m.status==='active';if(f==='deregistered')return m.status==='deregistered';
     if(f==='none')return !m.membership_id;if(f==='arrears')return Number(m.outstanding)>0;if(f==='advance')return Number(m.advance_paid)>0;return true})
    .map(m=>`<tr><td>${esc(m.full_name)}<br><span class="muted">${esc(m.email)}</span></td><td>${esc(m.phone)}</td><td>${esc(m.number||'')}</td><td>${m.status?tag(m.status):'<span class="muted">Awaiting</span>'}</td><td>${fdate(m.joined_on)}</td><td>${m.membership_id?money(m.outstanding):''}</td><td>${m.membership_id?money(m.advance_paid):''}</td>
-   <td>${m.status==='active'?`<button class="sm danger" data-dereg="${esc(m.membership_id)}" data-n="${esc(m.full_name)}">Deregister</button>`:`<button class="sm" data-reg="${esc(m.member_id)}" data-n="${esc(m.full_name)}">${m.membership_id?'Re-register':'Register'}</button>`}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No members match.</td></tr>';
+   <td>${m.status==='active'?`<button class="sm danger" data-dereg="${esc(m.membership_id)}" data-n="${esc(m.full_name)}">Deregister</button>`:`<button class="sm" data-reg="${esc(m.member_id)}" data-re="${m.membership_id?1:''}" data-n="${esc(m.full_name)}">${m.membership_id?'Re-register':'Register'}</button>`}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No members match.</td></tr>';
   document.querySelectorAll('[data-reg]').forEach(b=>b.onclick=()=>run(async()=>{
     const d=prompt(`Joining date for ${b.dataset.n} (YYYY-MM-DD). It can be a past date.`,today());if(!d)return;
+    if(b.dataset.re){
+      const[st,rt]=await Promise.all([db.from('org_settings').select('key,value').in('key',['reregistration_fee','reregistration_upfront_months']),db.from('contribution_rates').select('amount').eq('rate_type','monthly').lte('effective_from',d).order('effective_from',{ascending:false}).limit(1)]);
+      const o=Object.fromEntries((st.data||[]).map(x=>[x.key,+x.value])),need=(o.reregistration_fee||0)+(o.reregistration_upfront_months||0)*Number(rt.data?.[0]?.amount||0);
+      const amt=prompt(`Re-registering ${b.dataset.n} needs the fee of ${money(o.reregistration_fee)} plus ${o.reregistration_upfront_months} months paid upfront. Minimum total: ${money(need)}.\n\nEnter the total amount actually received (KSh):`,need);if(!amt)return;
+      const code=prompt('Transaction code for this payment:');if(!code)return;
+      const meth=prompt('Payment method (M-Pesa, Bank or Cash):','M-Pesa');if(!meth)return;
+      const rr=await rpc('reregister_member',{p_member_id:b.dataset.reg,p_joined_on:d,p_amount_received:+amt,p_method:meth,p_reference:code.trim(),p_paid_on:today()});
+      say(`${b.dataset.n} re-registered as ${rr.number}. The fee and upfront months are recorded.`);await refresh();return}
     const r=await rpc('register_membership',{p_member_id:b.dataset.reg,p_joined_on:d});say(`${b.dataset.n} registered as ${r.number}.`);await refresh()}));
   document.querySelectorAll('[data-dereg]').forEach(b=>b.onclick=()=>run(async()=>{
     const why=prompt(`Reason for deregistering ${b.dataset.n}:`);if(!why)return;
