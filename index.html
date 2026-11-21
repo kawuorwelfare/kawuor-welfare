@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KAWUOR WELFARE – Member portal</title>
+<style>
+:root{--bg:#f5f8f6;--surface:#fff;--ink:#14302b;--muted:#4d625e;--brand:#0f5c4d;--brand-ink:#fff;--accent:#f2b134;--line:#d3e0db;--ok:#1d7a4d;--warn:#a96a00;--bad:#b3261e;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1f1c;--surface:#16302b;--ink:#e8f1ee;--muted:#9db5af;--brand:#4fc3a8;--brand-ink:#06201a;--line:#27463f;--ok:#6fd39b;--warn:#f2b134;--bad:#ff8a80;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:1rem/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:60rem;margin:0 auto;padding:0 1rem}
+header{border-bottom:1px solid var(--line)}
+header .wrap{display:flex;justify-content:space-between;align-items:center;padding:.8rem 1rem}
+header b{font-size:1.1rem}
+h2{margin:0 0 .8rem;font-size:1.3rem}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:1rem;padding:1.2rem;margin:1rem 0}
+label{display:block;font-weight:600;margin:.8rem 0 .25rem}
+input,select{width:100%;padding:.7rem;border:1px solid var(--line);border-radius:.5rem;background:var(--bg);color:var(--ink);font:inherit}
+button,.btn{font:inherit;font-weight:700;padding:.7rem 1.2rem;border-radius:.5rem;border:2px solid var(--brand);background:var(--brand);color:var(--brand-ink);cursor:pointer}
+button.ghost{background:transparent;color:var(--ink)}
+button.link{border:0;background:none;color:var(--brand);padding:.3rem 0;text-decoration:underline}
+form button[type=submit]{margin-top:1rem}
+#msg{padding:.8rem 1rem;border-radius:.5rem;margin:1rem 0;font-weight:600;border:1px solid var(--line);background:var(--surface)}
+#msg.bad{color:var(--bad);border-color:var(--bad)}#msg.ok{color:var(--ok);border-color:var(--ok)}
+.tabs{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:1rem}
+.tabs button{background:transparent;color:var(--ink);border-color:var(--line)}
+.tabs button[aria-selected=true]{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.stats{display:grid;gap:.8rem;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))}
+.stat small{display:block;color:var(--muted)}.stat b{font-size:1.4rem}
+.months{display:grid;gap:.5rem;grid-template-columns:repeat(auto-fill,minmax(7rem,1fr))}
+.m{border:1px solid var(--line);border-radius:.6rem;padding:.5rem;font-size:.9rem}
+.m b{display:block}.m span{color:var(--muted);font-size:.8rem}
+.st-paid{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}
+.st-covered_in_advance{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 16%,transparent)}
+.st-partial{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 16%,transparent)}
+.st-unpaid{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,transparent)}
+.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse}td,th{padding:.5rem;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+.bar{height:.7rem;background:var(--line);border-radius:1rem;overflow:hidden;margin:.4rem 0}.bar i{display:block;height:100%;background:var(--accent)}
+.muted{color:var(--muted)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header><div class="wrap"><b>KAWUOR WELFARE</b><button id="logout" class="ghost" hidden>Log out</button></div></header>
+<main class="wrap">
+<div id="msg" role="status" hidden></div>
+
+<section id="auth" class="card" hidden>
+  <form id="f-login"><h2>Member login</h2>
+    <label for="l-email">Email</label><input id="l-email" type="email" autocomplete="email" required>
+    <label for="l-pass">Password</label><input id="l-pass" type="password" autocomplete="current-password" required>
+    <button type="submit">Log in</button>
+    <p><button type="button" class="link" data-go="forgot">Forgot password?</button> · <button type="button" class="link" data-go="register">Create an account</button></p></form>
+  <form id="f-register" hidden><h2>Create an account</h2>
+    <label for="r-name">Full name</label><input id="r-name" autocomplete="name" required>
+    <label for="r-phone">Phone number</label><input id="r-phone" type="tel" autocomplete="tel" required>
+    <label for="r-email">Email</label><input id="r-email" type="email" autocomplete="email" required>
+    <label for="r-pass">Password (at least 8 characters)</label><input id="r-pass" type="password" minlength="8" autocomplete="new-password" required>
+    <button type="submit">Register</button>
+    <p class="muted">An administrator will confirm your membership and give you your membership number.</p>
+    <p><button type="button" class="link" data-go="login">I already have an account</button></p></form>
+  <form id="f-forgot" hidden><h2>Reset your password</h2>
+    <label for="p-email">Email</label><input id="p-email" type="email" required>
+    <button type="submit">Send reset link</button>
+    <p><button type="button" class="link" data-go="login">Back to login</button></p></form>
+  <form id="f-reset" hidden><h2>Choose a new password</h2>
+    <label for="n-pass">New password (at least 8 characters)</label><input id="n-pass" type="password" minlength="8" autocomplete="new-password" required>
+    <button type="submit">Save new password</button></form>
+</section>
+
+<section id="app" hidden>
+  <div class="tabs" role="tablist">
+    <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button role="tab" data-tab="payments" aria-selected="false">Payments</button>
+    <button role="tab" data-tab="cases" aria-selected="false">Welfare cases</button>
+    <button role="tab" data-tab="account" aria-selected="false">Account</button>
+  </div>
+  <div id="p-overview"></div>
+  <div id="p-payments" hidden></div>
+  <div id="p-cases" hidden></div>
+  <div id="p-account" hidden></div>
+</section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>'KSh '+Number(n||0).toLocaleString('en-KE');
+const fdate=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
+const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const LABEL={paid:'Paid',partial:'Part paid',unpaid:'Unpaid',covered_in_advance:'Paid in advance',not_yet_due:'Not yet due'};
+const db=supabase.createClient(KAWUOR_CONFIG.url,KAWUOR_CONFIG.anonKey);
+let me=null,ms=null,year=new Date().getFullYear(),uid=null,recovering=false;
+
+function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=t?(bad?'bad':'ok'):'';m.hidden=!t}
+function friendly(e){if(e&&e.code==='23505')return 'That transaction code has already been submitted.';return (e&&e.message)||'Something went wrong. Please try again.'}
+async function run(fn){try{say('');await fn()}catch(e){say(friendly(e),true)}}
+function showAuth(v){for(const k of ['login','register','forgot','reset'])$('f-'+k).hidden=k!==v;$('auth').hidden=false;$('app').hidden=true;$('logout').hidden=true}
+document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{say('');showAuth(b.dataset.go)});
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-tab]').forEach(x=>x.setAttribute('aria-selected',x===b));
+  for(const t of ['overview','payments','cases','account'])$('p-'+t).hidden=t!==b.dataset.tab});
+
+$('f-login').onsubmit=e=>{e.preventDefault();run(async()=>{const{error}=await db.auth.signInWithPassword({email:$('l-email').value.trim(),password:$('l-pass').value});if(error)throw error})};
+$('f-register').onsubmit=e=>{e.preventDefault();run(async()=>{
+  const{data,error}=await db.auth.signUp({email:$('r-email').value.trim(),password:$('r-pass').value,options:{data:{full_name:$('r-name').value.trim(),phone:$('r-phone').value.trim()}}});
+  if(error)throw error;
+  if(!data.session){say('Account created. Check your email to confirm it, then log in.');showAuth('login')}})};
+$('f-forgot').onsubmit=e=>{e.preventDefault();run(async()=>{
+  const{error}=await db.auth.resetPasswordForEmail($('p-email').value.trim(),{redirectTo:location.origin+location.pathname});
+  if(error)throw error;say('If that email has an account, a reset link is on its way.')})};
+$('f-reset').onsubmit=e=>{e.preventDefault();run(async()=>{
+  const{error}=await db.auth.updateUser({password:$('n-pass').value});if(error)throw error;
+  recovering=false;say('Password updated.');await start()})};
+$('logout').onclick=()=>db.auth.signOut();
+
+db.auth.onAuthStateChange((ev,session)=>{
+  if(ev==='PASSWORD_RECOVERY'){recovering=true;showAuth('reset');return}
+  if(recovering)return;
+  if(session&&session.user){if(session.user.id!==uid)setTimeout(start,0)}
+  else{uid=null;showAuth('login')}});
+
+async function start(){await run(async()=>{
+  const{data:{user}}=await db.auth.getUser();if(!user){showAuth('login');return}
+  uid=user.id;
+  const r=await db.from('members').select('*').eq('user_id',uid).single();if(r.error)throw r.error;me=r.data;
+  const l=await db.from('memberships').select('*').eq('member_id',me.id).order('created_at',{ascending:false});if(l.error)throw l.error;
+  ms=l.data.find(x=>x.status==='active')||l.data[0]||null;
+  $('auth').hidden=true;$('app').hidden=false;$('logout').hidden=false;
+  await Promise.all([overview(),payments(),cases(),account()])})}
+
+async function overview(){
+  let h=`<div class="card"><h2>Hello, ${esc(me.full_name)}</h2>`;
+  if(!ms){$('p-overview').innerHTML=h+`<p>Your registration is waiting for an administrator to confirm your membership. Your membership number and contribution months will appear here once that is done.</p></div>`+await notices();return}
+  const [bal,mon,reg]=await Promise.all([
+    db.from('v_membership_balances').select('*').eq('membership_id',ms.id).maybeSingle(),
+    db.from('v_month_status').select('*').eq('membership_id',ms.id).order('period'),
+    db.from('payments').select('amount').eq('membership_id',ms.id).eq('kind','registration').eq('status','approved')]);
+  const rate=await db.from('contribution_rates').select('amount').eq('rate_type','registration').lte('effective_from',ms.joined_on).order('effective_from',{ascending:false}).limit(1);
+  const regPaid=(reg.data||[]).reduce((a,x)=>a+Number(x.amount),0),regDue=Number(rate.data?.[0]?.amount||0);
+  const rows=mon.data||[],years=[...new Set(rows.map(r=>+r.period.slice(0,4)).concat([year]))].sort();
+  h+=`<div class="stats">
+   <div class="stat"><small>Membership number</small><b>${esc(ms.number)}</b></div>
+   <div class="stat"><small>Status</small><b>${ms.status==='active'?'Active':'Deregistered'}</b></div>
+   <div class="stat"><small>Joined</small><b>${fdate(ms.joined_on)}</b></div>
+   <div class="stat"><small>Registration fee</small><b>${regPaid>=regDue?'Paid':'Not yet paid'}</b></div>
+   <div class="stat"><small>Outstanding</small><b>${money(bal.data?.outstanding)}</b></div>
+   <div class="stat"><small>Paid in advance</small><b>${money(bal.data?.advance_paid)}</b></div></div>`;
+  if(ms.status!=='active')h+=`<p>Deregistered on ${fdate(ms.deregistered_on)}: ${esc(ms.deregistration_reason)}. Please contact the group to register again.</p>`;
+  h+=`</div><div class="card"><h2>Monthly contributions</h2><label for="yr">Year</label><select id="yr">${years.map(y=>`<option${y===year?' selected':''}>${y}</option>`).join('')}</select><div class="months" style="margin-top:1rem">`;
+  for(let i=0;i<12;i++){const d=rows.find(r=>r.period===`${year}-${String(i+1).padStart(2,'0')}-01`);
+    h+=d?`<div class="m st-${d.status}"><b>${MN[i]}</b>${LABEL[d.status]}<br><span>${money(d.paid)} of ${money(d.due_amount)}</span></div>`:`<div class="m"><b>${MN[i]}</b><span>Not applicable</span></div>`}
+  $('p-overview').innerHTML=h+`</div></div>`+await notices();
+  $('yr').onchange=e=>{year=+e.target.value;overview()}}
+
+async function notices(){
+  const{data}=await db.from('announcements').select('*').eq('published',true).order('published_at',{ascending:false}).limit(10);
+  return `<div class="card"><h2>Announcements</h2>${(data||[]).map(a=>`<h3>${esc(a.title)}</h3><p>${esc(a.body)}</p>`).join('')||'<p class="muted">No announcements right now.</p>'}</div>`}
+
+async function payments(){
+  const[p,c]=await Promise.all([db.from('payments').select('*').eq('member_id',me.id).order('created_at',{ascending:false}),
+    db.from('v_case_progress').select('id,title,beneficiary_name').eq('status','open')]);
+  $('p-payments').innerHTML=`<div class="card"><h2>Submit a payment</h2>
+   <p class="muted">Pay first, then enter the details here. An administrator will check and approve it.</p>
+   <form id="f-pay"><label for="k">Payment for</label><select id="k"><option value="monthly">Monthly contribution</option><option value="registration">Registration fee</option><option value="special">Welfare case or other contribution</option></select>
+   <div id="cs" hidden><label for="cid">Welfare case</label><select id="cid"><option value="">General contribution</option>${(c.data||[]).map(x=>`<option value="${esc(x.id)}">${esc(x.title)} (${esc(x.beneficiary_name)})</option>`).join('')}</select></div>
+   <label for="amt">Amount (KSh)</label><input id="amt" type="number" min="1" step="1" required>
+   <label for="pd">Date paid</label><input id="pd" type="date" required value="${new Date().toISOString().slice(0,10)}">
+   <label for="mth">Method</label><select id="mth"><option>M-Pesa</option><option>Bank</option><option>Cash</option></select>
+   <label for="ref">Transaction code</label><input id="ref" required>
+   <button type="submit">Submit payment</button></form></div>
+  <div class="card"><h2>My payments</h2><div class="scroll"><table><thead><tr><th>Date</th><th>For</th><th>Amount</th><th>Code</th><th>Status</th></tr></thead><tbody>
+   ${(p.data||[]).map(x=>`<tr><td>${fdate(x.paid_on)}</td><td>${x.kind==='monthly'?'Monthly':x.kind==='registration'?'Registration':'Special'}</td><td>${money(x.amount)}</td><td>${esc(x.reference)}</td><td>${({pending:'Waiting for approval',approved:'Approved',rejected:'Rejected'+(x.review_note?': '+esc(x.review_note):''),reversed:'Reversed'})[x.status]}</td></tr>`).join('')||'<tr><td colspan="5" class="muted">No payments yet.</td></tr>'}
+   </tbody></table></div></div>`;
+  $('k').onchange=e=>{$('cs').hidden=e.target.value!=='special'};
+  $('f-pay').onsubmit=e=>{e.preventDefault();run(async()=>{
+    const row={member_id:me.id,kind:$('k').value,amount:+$('amt').value,paid_on:$('pd').value,method:$('mth').value,reference:$('ref').value.trim(),status:'pending'};
+    if(row.kind==='special'&&$('cid').value)row.case_id=$('cid').value;
+    const{error}=await db.from('payments').insert(row);if(error)throw error;
+    say('Payment submitted. It will show as approved once an administrator confirms it.');await payments()})}}
+
+async function cases(){
+  const{data,error}=await db.from('v_case_progress').select('*').order('status').order('case_date',{ascending:false});
+  $('p-cases').innerHTML=error?'<div class="card">Could not load cases.</div>':(data||[]).map(x=>`<div class="card"><h2>${esc(x.title)}</h2>
+   <p><b>${esc(x.beneficiary_name)}</b> · ${fdate(x.case_date)} · ${x.status==='open'?'Open':'Closed'}</p><p>${esc(x.details)}</p>
+   ${x.target_amount?`<div class="bar" role="img" aria-label="${x.percent}% collected"><i style="width:${x.percent}%"></i></div><p>Collected ${money(x.collected)} of ${money(x.target_amount)} · Remaining ${money(x.remaining)}</p>`:`<p>Collected ${money(x.collected)}</p>`}</div>`).join('')||'<div class="card muted">No welfare cases at the moment.</div>'}
+
+function account(){
+  $('p-account').innerHTML=`<div class="card"><h2>My details</h2><form id="f-me"><label for="a-name">Full name</label><input id="a-name" value="${esc(me.full_name)}" required>
+   <label for="a-phone">Phone</label><input id="a-phone" type="tel" value="${esc(me.phone)}"><label>Email</label><input value="${esc(me.email)}" disabled>
+   <button type="submit">Save details</button></form></div>
+   <div class="card"><h2>Change password</h2><form id="f-pw"><label for="a-pw">New password (at least 8 characters)</label><input id="a-pw" type="password" minlength="8" autocomplete="new-password" required><button type="submit">Update password</button></form></div>`;
+  $('f-me').onsubmit=e=>{e.preventDefault();run(async()=>{
+    const{error}=await db.from('members').update({full_name:$('a-name').value.trim(),phone:$('a-phone').value.trim()}).eq('id',me.id);if(error)throw error;
+    me.full_name=$('a-name').value.trim();say('Details saved.')})};
+  $('f-pw').onsubmit=e=>{e.preventDefault();run(async()=>{
+    const{error}=await db.auth.updateUser({password:$('a-pw').value});if(error)throw error;$('a-pw').value='';say('Password updated.')})}}
+
+if(!KAWUOR_CONFIG.url||KAWUOR_CONFIG.url.includes('YOUR-PROJECT'))say('Setup needed: add your Supabase URL and anon key to config.js.',true);
+</script>
+</body>
+</html>
