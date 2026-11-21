@@ -153,7 +153,10 @@ async function overview(){
   if(ms.status!=='active'){
     const[st,rt]=await Promise.all([db.from('org_settings').select('key,value').in('key',['reregistration_fee','reregistration_upfront_months']),db.from('contribution_rates').select('amount').eq('rate_type','monthly').order('effective_from',{ascending:false}).limit(1)]);
     const o=Object.fromEntries((st.data||[]).map(x=>[x.key,+x.value])),fee=o.reregistration_fee||0,mo=o.reregistration_upfront_months||0,mr=Number(rt.data?.[0]?.amount||0);
-    h+=`<p>Deregistered on ${fdate(ms.deregistered_on)}: ${esc(ms.deregistration_reason)}.</p><p><b>To register again:</b> pay the re-registration fee of ${money(fee)} and ${mo} months of contributions upfront (${money(mo*mr)}), ${money(fee+mo*mr)} in total. Then contact the group so an administrator can register you again. Your account and history are kept.</p>`}
+    const grace=ms.reinstate_until&&ms.reinstate_until>=new Date().toISOString().slice(0,10);
+    h+=`<p>Deregistered on ${fdate(ms.deregistered_on)}: ${esc(ms.deregistration_reason)}.</p>`+(grace
+      ?`<p><b>You can keep your membership number.</b> Pay everything you owe up to now by ${fdate(ms.reinstate_until)}, then contact the group so an administrator can reinstate you. After that date you will need to register again.</p>`
+      :`<p><b>To register again:</b> pay the re-registration fee of ${money(fee)} and ${mo} months of contributions upfront (${money(mo*mr)}), ${money(fee+mo*mr)} in total. Then contact the group so an administrator can register you again. Your account and history are kept, and the old arrears stay on your earlier record.</p>`)}
   h+=`</div><div class="card"><h2>Monthly contributions</h2><label for="yr">Year</label><select id="yr">${years.map(y=>`<option${y===year?' selected':''}>${y}</option>`).join('')}</select><div class="months" style="margin-top:1rem">`;
   for(let i=0;i<12;i++){const d=rows.find(r=>r.period===`${year}-${String(i+1).padStart(2,'0')}-01`);
     h+=d?`<div class="m st-${d.status}"><b>${MN[i]}</b>${LABEL[d.status]}<br><span>${money(d.paid)} of ${money(d.due_amount)}</span></div>`:`<div class="m"><b>${MN[i]}</b><span>Not applicable</span></div>`}

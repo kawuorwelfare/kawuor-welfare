@@ -35,7 +35,7 @@ form button[type=submit]{margin-top:1rem}
 </style>
 </head>
 <body>
-<header><div class="wrap"><b>KAWUOR WELFARE · Administration</b> <small class="muted">version 9 · re-registration</small><span><a class="btn ghost sm" href="index.html">Member portal</a> <button id="logout" class="ghost sm" hidden>Log out</button></span></div></header>
+<header><div class="wrap"><b>KAWUOR WELFARE · Administration</b> <small class="muted">version 10 · one-month window</small><span><a class="btn ghost sm" href="index.html">Member portal</a> <button id="logout" class="ghost sm" hidden>Log out</button></span></div></header>
 <main class="wrap">
 <div id="msg" role="status" hidden></div>
 <form id="f-login" class="card" hidden><h2>Administrator login</h2>
@@ -114,7 +114,7 @@ function drawMembers(){
     if(f==='active')return m.status==='active';if(f==='deregistered')return m.status==='deregistered';
     if(f==='none')return !m.membership_id;if(f==='arrears')return Number(m.outstanding)>0;if(f==='advance')return Number(m.advance_paid)>0;return true})
    .map(m=>`<tr><td>${esc(m.full_name)}<br><span class="muted">${esc(m.email)}</span></td><td>${esc(m.phone)}</td><td>${esc(m.number||'')}</td><td>${m.status?tag(m.status):'<span class="muted">Awaiting</span>'}</td><td>${fdate(m.joined_on)}</td><td>${m.membership_id?money(m.outstanding):''}</td><td>${m.membership_id?money(m.advance_paid):''}</td>
-   <td>${m.status==='active'?`<button class="sm danger" data-dereg="${esc(m.membership_id)}" data-n="${esc(m.full_name)}">Deregister</button>`:`<button class="sm" data-reg="${esc(m.member_id)}" data-re="${m.membership_id?1:''}" data-n="${esc(m.full_name)}">${m.membership_id?'Re-register':'Register'}</button>`}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No members match.</td></tr>';
+   <td>${m.status==='active'?`<button class="sm danger" data-dereg="${esc(m.membership_id)}" data-n="${esc(m.full_name)}">Deregister</button>`:(m.status==='deregistered'&&m.reinstate_until&&m.reinstate_until>=today())?`<button class="sm" data-rein="${esc(m.membership_id)}" data-n="${esc(m.full_name)}">Reinstate</button><br><span class="muted">until ${fdate(m.reinstate_until)}</span>`:`<button class="sm" data-reg="${esc(m.member_id)}" data-re="${m.membership_id?1:''}" data-n="${esc(m.full_name)}">${m.membership_id?'Re-register':'Register'}</button>`}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No members match.</td></tr>';
   document.querySelectorAll('[data-reg]').forEach(b=>b.onclick=()=>run(async()=>{
     const d=prompt(`Joining date for ${b.dataset.n} (YYYY-MM-DD). It can be a past date.`,today());if(!d)return;
     if(b.dataset.re){
@@ -128,7 +128,14 @@ function drawMembers(){
     const r=await rpc('register_membership',{p_member_id:b.dataset.reg,p_joined_on:d});say(`${b.dataset.n} registered as ${r.number}.`);await refresh()}));
   document.querySelectorAll('[data-dereg]').forEach(b=>b.onclick=()=>run(async()=>{
     const why=prompt(`Reason for deregistering ${b.dataset.n}:`);if(!why)return;
-    await rpc('deregister_membership',{p_membership_id:b.dataset.dereg,p_reason:why,p_date:today()});say('Membership deregistered.');await refresh()}))}
+    await rpc('deregister_membership',{p_membership_id:b.dataset.dereg,p_reason:why,p_date:today()});say('Membership deregistered.');await refresh()}));
+  document.querySelectorAll('[data-rein]').forEach(b=>b.onclick=()=>run(async()=>{
+    const q=await rpc('reinstatement_quote',{p_membership_id:b.dataset.rein});
+    const amt=prompt(`${b.dataset.n} can keep their old membership by clearing everything owed up to now: ${money(q)}.\n\nEnter the total amount actually received (KSh):`,q);if(!amt)return;
+    const code=prompt('Transaction code for this payment:');if(!code)return;
+    const meth=prompt('Payment method (M-Pesa, Bank or Cash):','M-Pesa');if(!meth)return;
+    const r=await rpc('reinstate_membership',{p_membership_id:b.dataset.rein,p_amount_received:+amt,p_method:meth,p_reference:code.trim(),p_paid_on:today()});
+    say(`${b.dataset.n} reinstated on ${r.number}.`);await refresh()}))}
 
 async function payTab(){
   const{data,error}=await db.from('v_admin_payments').select('*').order('created_at',{ascending:false}).limit(300);if(error)throw error;
