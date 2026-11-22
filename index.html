@@ -84,11 +84,13 @@ button:hover,a.btn:hover{filter:brightness(1.12)}
     <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
     <button role="tab" data-tab="payments" aria-selected="false">Payments</button>
     <button role="tab" data-tab="cases" aria-selected="false">Welfare cases</button>
+    <button role="tab" data-tab="docs" aria-selected="false">Documents</button>
     <button role="tab" data-tab="account" aria-selected="false">Account</button>
   </div>
   <div id="p-overview"></div>
   <div id="p-payments" hidden></div>
   <div id="p-cases" hidden></div>
+  <div id="p-docs" hidden></div>
   <div id="p-account" hidden></div>
 </section>
 </main>
@@ -112,7 +114,7 @@ function showAuth(v){for(const k of ['login','register','forgot','reset'])$('f-'
 document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{say('');showAuth(b.dataset.go)});
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('[data-tab]').forEach(x=>x.setAttribute('aria-selected',x===b));
-  for(const t of ['overview','payments','cases','account'])$('p-'+t).hidden=t!==b.dataset.tab});
+  for(const t of ['overview','payments','cases','docs','account'])$('p-'+t).hidden=t!==b.dataset.tab});
 
 $('f-login').onsubmit=e=>{e.preventDefault();run(async()=>{const{error}=await db.auth.signInWithPassword({email:$('l-email').value.trim(),password:$('l-pass').value});if(error)throw error})};
 $('f-register').onsubmit=e=>{e.preventDefault();run(async()=>{
@@ -140,7 +142,7 @@ async function start(){await run(async()=>{
   const l=await db.from('memberships').select('*').eq('member_id',me.id).order('created_at',{ascending:false});if(l.error)throw l.error;
   ms=l.data.find(x=>x.status==='active')||l.data[0]||null;
   $('auth').hidden=true;$('app').hidden=false;$('logout').hidden=false;
-  await Promise.all([overview(),payments(),cases(),account()])})}
+  await Promise.all([overview(),payments(),cases(),docs(),account()])})}
 
 async function overview(){
   let h=`<div class="card"><h2>Hello, ${esc(me.full_name)}</h2>`;
@@ -214,6 +216,12 @@ function account(){
     me.full_name=$('a-name').value.trim();say('Details saved.')})};
   $('f-pw').onsubmit=e=>{e.preventDefault();run(async()=>{
     const{error}=await db.auth.updateUser({password:$('a-pw').value});if(error)throw error;$('a-pw').value='';say('Password updated.')})}}
+
+async function docs(){
+  const{data,error}=await db.from('documents').select('*').order('created_at',{ascending:false});
+  const bytes=n=>n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';
+  $('p-docs').innerHTML=error?'<div class="card">Could not load documents.</div>':(data||[]).map(d=>`<div class="card"><h2>${esc(d.title)}</h2><p class="muted">${esc(d.category)} · ${fdate(d.created_at.slice(0,10))} · ${bytes(d.size_bytes)}</p>${d.description?`<p>${esc(d.description)}</p>`:''}<button data-open="${esc(d.file_path)}">Open ${esc(d.file_name)}</button></div>`).join('')||'<div class="card muted">No documents are available to you at the moment. Documents are shared with active members.</div>';
+  document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>run(async()=>{const r=await db.storage.from('documents').createSignedUrl(b.dataset.open,120);if(r.error)throw r.error;window.open(r.data.signedUrl,'_blank','noopener')}))}
 
 if(!KAWUOR_CONFIG.url||KAWUOR_CONFIG.url.includes('YOUR-PROJECT'))say('Setup needed: add your Supabase URL and anon key to config.js.',true);
 </script>
