@@ -104,7 +104,7 @@ const money=n=>'KSh '+Number(n||0).toLocaleString('en-KE');
 const fdate=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
 const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const LABEL={paid:'Paid',partial:'Part paid',unpaid:'Unpaid',covered_in_advance:'Paid in advance',not_yet_due:'Not yet due'};
-const db=supabase.createClient(KAWUOR_CONFIG.url,KAWUOR_CONFIG.anonKey,{auth:{storageKey:'kawuor-member-auth'}});
+const db=supabase.createClient(KAWUOR_CONFIG.url,KAWUOR_CONFIG.anonKey);
 let me=null,ms=null,year=new Date().getFullYear(),uid=null,recovering=false;
 
 function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=t?(bad?'bad':'ok'):'';m.hidden=!t}
@@ -141,6 +141,7 @@ async function start(){await run(async()=>{
   const ro=await db.from('user_roles').select('role').eq('user_id',uid).maybeSingle();
   if(ro.data){$('auth').hidden=true;$('app').hidden=true;$('logout').hidden=false;say('This is an administrator account, not a member account. Please use the administrator page (admin.html).',true);return}
   const r=await db.from('members').select('*').eq('user_id',uid).single();if(r.error)throw r.error;me=r.data;
+  if(me.removed_at){$('auth').hidden=true;$('app').hidden=true;$('logout').hidden=false;say('This account has been closed. Please contact the group.',true);return}
   const l=await db.from('memberships').select('*').eq('member_id',me.id).order('created_at',{ascending:false});if(l.error)throw l.error;
   ms=l.data.find(x=>x.status==='active')||l.data[0]||null;
   $('auth').hidden=true;$('app').hidden=false;$('logout').hidden=false;
@@ -195,20 +196,20 @@ async function payments(){
    <label for="amt">Amount (KSh)</label><input id="amt" type="number" min="1" step="1" required>
    <label for="pd">Date paid</label><input id="pd" type="date" required value="${new Date().toISOString().slice(0,10)}">
    <label for="mth">Method</label><select id="mth"><option>M-Pesa</option><option>Bank</option><option>Cash</option></select>
-   <div id="msg-w"><label for="pmsg">Payment message</label><textarea id="pmsg" rows="4" placeholder="Copy the whole M-Pesa or bank message you received, and paste it here"></textarea><p id="msg-r" class="muted"></p></div>
+   <div id="msg-w"><label for="msg">Payment message</label><textarea id="msg" rows="4" placeholder="Copy the whole M-Pesa or bank message you received, and paste it here"></textarea><p id="msg-r" class="muted"></p></div>
    <div id="man-w" hidden><label for="ref">Transaction code (type it only if we could not read it)</label><input id="ref"></div>
    <button type="submit">Submit payment</button></form></div>
   <div class="card"><h2>My payments</h2><div class="scroll"><table><thead><tr><th>Date</th><th>For</th><th>Amount</th><th>Code</th><th>Status</th></tr></thead><tbody>
    ${(p.data||[]).map(x=>`<tr><td>${fdate(x.paid_on)}</td><td>${({monthly:'Monthly',registration:'Registration',reregistration:'Re-registration'})[x.kind]||'Special'}${x.period_year?' '+x.period_year:''}</td><td>${money(x.amount)}</td><td>${esc(x.reference)}</td><td>${({pending:'Waiting for approval',approved:'Approved',rejected:'Rejected'+(x.review_note?': '+esc(x.review_note):''),reversed:'Reversed'})[x.status]}</td></tr>`).join('')||'<tr><td colspan="5" class="muted">No payments yet.</td></tr>'}
    </tbody></table></div></div>`;
-  const upd=()=>{const k=$('k').value,cash=$('mth').value==='Cash',has=!!$('pmsg').value.trim(),pm=cash?null:parseMsg($('pmsg').value),ok=!!(pm&&pm.code&&pm.amount);
+  const upd=()=>{const k=$('k').value,cash=$('mth').value==='Cash',has=!!$('msg').value.trim(),pm=cash?null:parseMsg($('msg').value),ok=!!(pm&&pm.code&&pm.amount);
     $('cs').hidden=k!=='special';$('yr-w').hidden=k!=='monthly';$('msg-w').hidden=cash;$('man-w').hidden=cash||ok||!has;
     $('msg-r').textContent=cash||!has?'':ok?`Found: code ${pm.code} and amount KSh ${pm.amount.toLocaleString('en-KE')}.`:'We could not read the code and amount. Please check you pasted the whole message, or type them below.';
     if(k==='reregistration'){$('amt').value=reNeed;$('amt').readOnly=true}else if(pm&&pm.amount){$('amt').value=pm.amount;$('amt').readOnly=true}else{$('amt').readOnly=false}};
-  $('k').onchange=$('mth').onchange=$('pmsg').oninput=upd;upd();
+  $('k').onchange=$('mth').onchange=$('msg').oninput=upd;upd();
   
   $('f-pay').onsubmit=e=>{e.preventDefault();run(async()=>{
-    const cash=$('mth').value==='Cash',msg=$('pmsg').value.trim(),k=$('k').value,pm=cash?null:parseMsg(msg);
+    const cash=$('mth').value==='Cash',msg=$('msg').value.trim(),k=$('k').value,pm=cash?null:parseMsg(msg);
     if(!cash&&!msg)throw new Error('Please paste the payment message you received.');
     const code=cash?null:((pm&&pm.code)||$('ref').value.trim());if(!cash&&!code)throw new Error('We could not find the transaction code. Please type it in the code box.');
     if(k==='reregistration'&&pm&&pm.amount&&pm.amount!==reNeed)throw new Error(`Re-registration is exactly KSh ${reNeed.toLocaleString('en-KE')}, but your message shows KSh ${pm.amount.toLocaleString('en-KE')}.`);
