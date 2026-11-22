@@ -104,7 +104,7 @@ const money=n=>'KSh '+Number(n||0).toLocaleString('en-KE');
 const fdate=d=>d?new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
 const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const LABEL={paid:'Paid',partial:'Part paid',unpaid:'Unpaid',covered_in_advance:'Paid in advance',not_yet_due:'Not yet due'};
-const db=supabase.createClient(KAWUOR_CONFIG.url,KAWUOR_CONFIG.anonKey);
+const db=supabase.createClient(KAWUOR_CONFIG.url,KAWUOR_CONFIG.anonKey,{auth:{storageKey:'kawuor-member-auth'}});
 let me=null,ms=null,year=new Date().getFullYear(),uid=null,recovering=false;
 
 function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=t?(bad?'bad':'ok'):'';m.hidden=!t}
