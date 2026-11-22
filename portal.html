@@ -138,6 +138,8 @@ db.auth.onAuthStateChange((ev,session)=>{
 async function start(){await run(async()=>{
   const{data:{user}}=await db.auth.getUser();if(!user){showAuth('login');return}
   uid=user.id;
+  const ro=await db.from('user_roles').select('role').eq('user_id',uid).maybeSingle();
+  if(ro.data){$('auth').hidden=true;$('app').hidden=true;$('logout').hidden=false;say('This is an administrator account, not a member account. Please use the administrator page (admin.html).',true);return}
   const r=await db.from('members').select('*').eq('user_id',uid).single();if(r.error)throw r.error;me=r.data;
   const l=await db.from('memberships').select('*').eq('member_id',me.id).order('created_at',{ascending:false});if(l.error)throw l.error;
   ms=l.data.find(x=>x.status==='active')||l.data[0]||null;
@@ -181,24 +183,29 @@ async function notices(){
 async function payments(){
   const[p,c]=await Promise.all([db.from('payments').select('*').eq('member_id',me.id).order('created_at',{ascending:false}),
     db.from('v_case_progress').select('id,title,beneficiary_name').eq('status','open')]);
+  const act=ms&&ms.status==='active',today0=new Date().toISOString().slice(0,10),canRe=ms&&ms.status==='deregistered'&&!(ms.reinstate_until&&ms.reinstate_until>=today0);
+  let reNeed=0;
+  if(canRe){const[st,rt]=await Promise.all([db.from('org_settings').select('key,value').in('key',['reregistration_fee','reregistration_upfront_months']),db.from('contribution_rates').select('amount').eq('rate_type','monthly').order('effective_from',{ascending:false}).limit(1)]);const o=Object.fromEntries((st.data||[]).map(x=>[x.key,+x.value]));reNeed=(o.reregistration_fee||0)+(o.reregistration_upfront_months||0)*Number(rt.data?.[0]?.amount||0)}
+  const kopts=(act?'<option value="monthly">Monthly contribution</option><option value="registration">Registration fee</option>':'')+(canRe?`<option value="reregistration">Re-registration (KSh ${reNeed.toLocaleString('en-KE')} exactly)</option>`:'')+'<option value="special">Welfare case or other contribution</option>';
   $('p-payments').innerHTML=`<div class="card"><h2>Submit a payment</h2>
    <p class="muted">Pay first, then enter the details here. An administrator will check and approve it.</p>
-   <form id="f-pay"><label for="k">Payment for</label><select id="k"><option value="monthly">Monthly contribution</option><option value="registration">Registration fee</option><option value="special">Welfare case or other contribution</option></select>
+   <form id="f-pay"><label for="k">Payment for</label><select id="k">${kopts}</select>
    <div id="cs" hidden><label for="cid">Welfare case</label><select id="cid"><option value="">General contribution</option>${(c.data||[]).map(x=>`<option value="${esc(x.id)}">${esc(x.title)} (${esc(x.beneficiary_name)})</option>`).join('')}</select></div>
+   <div id="yr-w"><label for="yr2">Contribution year</label><select id="yr2">${[1,0,-1,-2].map(d=>`<option${d===0?' selected':''}>${new Date().getFullYear()+d}</option>`).join('')}</select></div>
    <label for="amt">Amount (KSh)</label><input id="amt" type="number" min="1" step="1" required>
    <label for="pd">Date paid</label><input id="pd" type="date" required value="${new Date().toISOString().slice(0,10)}">
    <label for="mth">Method</label><select id="mth"><option>M-Pesa</option><option>Bank</option><option>Cash</option></select>
    <div id="ref-w"><label for="ref">Transaction code</label><input id="ref" required></div><div id="prf-w"><label for="prf">Payment message (screenshot or PDF of the M-Pesa or bank message)</label><input id="prf" type="file" accept="image/png,image/jpeg,image/webp,application/pdf" required></div>
    <button type="submit">Submit payment</button></form></div>
   <div class="card"><h2>My payments</h2><div class="scroll"><table><thead><tr><th>Date</th><th>For</th><th>Amount</th><th>Code</th><th>Status</th></tr></thead><tbody>
-   ${(p.data||[]).map(x=>`<tr><td>${fdate(x.paid_on)}</td><td>${x.kind==='monthly'?'Monthly':x.kind==='registration'?'Registration':'Special'}</td><td>${money(x.amount)}</td><td>${esc(x.reference)}</td><td>${({pending:'Waiting for approval',approved:'Approved',rejected:'Rejected'+(x.review_note?': '+esc(x.review_note):''),reversed:'Reversed'})[x.status]}</td></tr>`).join('')||'<tr><td colspan="5" class="muted">No payments yet.</td></tr>'}
+   ${(p.data||[]).map(x=>`<tr><td>${fdate(x.paid_on)}</td><td>${({monthly:'Monthly',registration:'Registration',reregistration:'Re-registration'})[x.kind]||'Special'}${x.period_year?' '+x.period_year:''}</td><td>${money(x.amount)}</td><td>${esc(x.reference)}</td><td>${({pending:'Waiting for approval',approved:'Approved',rejected:'Rejected'+(x.review_note?': '+esc(x.review_note):''),reversed:'Reversed'})[x.status]}</td></tr>`).join('')||'<tr><td colspan="5" class="muted">No payments yet.</td></tr>'}
    </tbody></table></div></div>`;
-  $('k').onchange=e=>{$('cs').hidden=e.target.value!=='special'};
+  const kc=()=>{const k=$('k').value;$('cs').hidden=k!=='special';$('yr-w').hidden=k!=='monthly';$('amt').readOnly=k==='reregistration';if(k==='reregistration')$('amt').value=reNeed};$('k').onchange=kc;kc();
   const tog=()=>{const c=$('mth').value==='Cash';$('ref-w').hidden=c;$('prf-w').hidden=c;$('ref').required=!c;$('prf').required=!c};$('mth').onchange=tog;tog();
   $('f-pay').onsubmit=e=>{e.preventDefault();run(async()=>{
     const cash=$('mth').value==='Cash',f=$('prf').files[0];if(!cash&&!f)throw new Error('Attach the payment message (screenshot or PDF).');
     const path=cash?null:await uploadProof(f);
-    const row={member_id:me.id,kind:$('k').value,amount:+$('amt').value,paid_on:$('pd').value,method:$('mth').value,reference:cash?null:$('ref').value.trim(),proof_path:path,status:'pending'};
+    const row={period_year:$('k').value==='monthly'?+$('yr2').value:null,member_id:me.id,kind:$('k').value,amount:+$('amt').value,paid_on:$('pd').value,method:$('mth').value,reference:cash?null:$('ref').value.trim(),proof_path:path,status:'pending'};
     if(row.kind==='special'&&$('cid').value)row.case_id=$('cid').value;
     const{error}=await db.from('payments').insert(row);if(error){if(path)await db.storage.from('payment-proofs').remove([path]);throw error}
     say('Payment submitted. It will show as approved once an administrator confirms it.');await payments()})}}
