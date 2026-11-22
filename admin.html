@@ -85,7 +85,7 @@ const money=n=>'KSh '+Number(n||0).toLocaleString('en-KE');
 const fdate=d=>d?new Date(d.slice(0,10)+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'';
 const today=()=>new Date().toISOString().slice(0,10);
 const KIND={monthly:'Monthly',registration:'Registration',special:'Special',reregistration:'Re-registration'};
-const db=supabase.createClient(KAWUOR_CONFIG.url,KAWUOR_CONFIG.anonKey);
+const db=supabase.createClient(KAWUOR_CONFIG.url,KAWUOR_CONFIG.anonKey,{auth:{storageKey:'kawuor-admin-auth'}});
 let uid=null,members=[],started=false,editPay=null;
 
 function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=t?(bad?'bad':'ok'):'';m.hidden=!t}
