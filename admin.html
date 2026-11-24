@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Great Kawuor Welfare Group – Administration</title>
+<link rel="manifest" href="manifest-admin.json"><meta name="theme-color" content="#14452b"><link rel="icon" href="icon-admin-192.png"><link rel="apple-touch-icon" href="apple-touch-icon-admin.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Kawuor Admin">
 <style>
 :root{--bg:#f4f8f5;--surface:#fff;--ink:#12281d;--muted:#4a5d52;--brand:#1b5e3a;--brand-ink:#fff;--accent:#d4a017;--line:#d5e2d9;--ok:#1d7a4d;--warn:#a96a00;--bad:#b3261e;color-scheme:light}
 @media (prefers-color-scheme:dark){:root{--bg:#0f1f16;--surface:#162b1f;--ink:#e9f2ec;--muted:#a3b8aa;--brand:#5fbf86;--brand-ink:#06190f;--line:#2a4535;--ok:#6fd39b;--warn:#d4a017;--bad:#ff8a80;color-scheme:dark}}
@@ -602,6 +603,7 @@ async function oiTab(){
   document.querySelectorAll('[data-oe]').forEach(b=>b.onclick=()=>{editOI=data.find(r=>r.id===b.dataset.oe);oiTab().then(()=>scrollTo(0,0))});
   document.querySelectorAll('[data-ox]').forEach(b=>b.onclick=()=>run(async()=>{const why=prompt('Reason for deleting this income record:');if(!why)return;await rpc('admin_delete_other_income',{p_id:b.dataset.ox,p_reason:why});say('Income record deleted.');await refresh()}))}
 
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 if(!KAWUOR_CONFIG.url||KAWUOR_CONFIG.url.includes('YOUR-PROJECT'))say('Setup needed: add your Supabase URL and key to config.js.',true);
 </script>
 </body>

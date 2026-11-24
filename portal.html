@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Great Kawuor Welfare Group – Member portal</title>
+<link rel="manifest" href="manifest-portal.json"><meta name="theme-color" content="#14452b"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Kawuor Welfare">
 <style>
 :root{--bg:#f4f8f5;--surface:#fff;--ink:#12281d;--muted:#4a5d52;--brand:#1b5e3a;--brand-ink:#fff;--accent:#d4a017;--line:#d5e2d9;--ok:#1d7a4d;--warn:#a96a00;--bad:#b3261e;color-scheme:light}
 @media (prefers-color-scheme:dark){:root{--bg:#0f1f16;--surface:#162b1f;--ink:#e9f2ec;--muted:#a3b8aa;--brand:#5fbf86;--brand-ink:#06190f;--line:#2a4535;--ok:#6fd39b;--warn:#d4a017;--bad:#ff8a80;color-scheme:dark}}
@@ -320,6 +321,7 @@ function memberShared(myNumber,caseOpts){
     if(r.error)throw r.error;
     say('Your shared payment was submitted. The administrator will check it and share it out between the members.');await payments()})}}
 
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 if(!KAWUOR_CONFIG.url||KAWUOR_CONFIG.url.includes('YOUR-PROJECT'))say('Setup needed: add your Supabase URL and anon key to config.js.',true);
 </script>
 </body>
